@@ -41,3 +41,17 @@ Setup details (env vars, database, scripts) have not been added yet.
 - **Code quality**: keep imports organized, remove unused variables, follow consistent naming conventions.
 - **Documentation**: document key classes, methods, and modules where it aids maintainability (JSDoc or equivalent).
 - **Definition of done**: tested, readable, documented, follows coding standards, and ready to be safely reviewed and merged.
+
+## Agent skills
+
+### Issue tracker
+
+GitHub Issues in `AmaliTech-Training-Academy/Ride-Connect-Backend`, via the `gh` CLI. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Default five canonical roles: `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: `CONTEXT.md` + `docs/adr/` at the repo root. See `docs/agents/domain.md`.
