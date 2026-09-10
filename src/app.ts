@@ -8,11 +8,6 @@ import { notFoundHandler } from './middlewares/notFound.middleware';
 import { healthRouter } from './routes/health.routes';
 import { testOnlyRouter } from './routes/test-only.routes';
 
-/**
- * Fully configured Express application. Deliberately has no `.listen()`
- * call so it can be started by `src/server.ts` or exercised directly by
- * tests (e.g. via supertest) without binding a network port.
- */
 export const app = express();
 
 app.use(helmet());
