@@ -36,7 +36,7 @@ Setup details (env vars, database, scripts) have not been added yet.
 
 ## Working agreements
 
-- **Commits**: organize backend PRs into logical commits rather than splitting into multiple PRs (e.g. one commit for auth, one for business logic, one for tests). Target ~200 lines per commit (flexible; test files are exempt from the cap) and ~5 commits per PR as a guideline, not a hard rule. Large initial scaffolding work is excluded from these limits.
+- **Commits**: organize backend PRs into logical commits rather than splitting into multiple PRs (e.g. one commit for auth, one for business logic, one for tests). Target ~200 lines per commit (flexible; test files are exempt from the cap) and ~5 commits per PR as a guideline, not a hard rule. Large initial scaffolding work is excluded from these limits. Commit messages must follow [Conventional Commits](https://www.conventionalcommits.org/) (`type: subject`, e.g. `fix: handle empty ride list`); a `commit-msg` hook (husky + commitlint) enforces this on every commit.
 - **Testing**: tests must pass before work is considered done. Target 75% coverage minimum (80% for stricter areas).
 - **Code quality**: keep imports organized, remove unused variables, follow consistent naming conventions.
 - **Documentation**: document key classes, methods, and modules where it aids maintainability (JSDoc or equivalent).
