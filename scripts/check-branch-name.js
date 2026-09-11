@@ -4,6 +4,9 @@ const { execFileSync } = require('node:child_process');
 /** Long-lived remotes: main (prod), develop (dev), testing. */
 const LONG_LIVED_BRANCHES = new Set(['main', 'develop', 'testing']);
 
+/** Created before branch naming was enforced. Do not add new names here. */
+const GRANDFATHERED_BRANCHES = new Set(['chore/initial-boilerplate-setup']);
+
 /** `feat/<us-id>-short-desc` — us-id is US1–US7 or T1–T10. */
 const FEATURE_BRANCH = /^feat\/(?:us[1-7]|t(?:[1-9]|10))-[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
@@ -16,7 +19,10 @@ const HOTFIX_BRANCH = /^fix\/[a-z0-9]+(?:-[a-z0-9]+)*$/;
  */
 function isAllowedBranchName(branch) {
   return (
-    LONG_LIVED_BRANCHES.has(branch) || FEATURE_BRANCH.test(branch) || HOTFIX_BRANCH.test(branch)
+    LONG_LIVED_BRANCHES.has(branch) ||
+    GRANDFATHERED_BRANCHES.has(branch) ||
+    FEATURE_BRANCH.test(branch) ||
+    HOTFIX_BRANCH.test(branch)
   );
 }
 
