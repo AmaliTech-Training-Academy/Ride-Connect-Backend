@@ -16,6 +16,7 @@
     "lint:fix": "eslint . --fix && prettier --write .",
     "test": "jest",
     "check:branch": "node scripts/check-branch-name.js",
+    "check:commits": "node scripts/check-commit-messages.js",
     "prepare": "husky"
   },
   "dependencies": {

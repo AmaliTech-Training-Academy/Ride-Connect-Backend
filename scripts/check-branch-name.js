@@ -17,10 +17,18 @@ const HOTFIX_BRANCH = /^fix\/[a-z0-9]+(?:-[a-z0-9]+)*$/;
  * @param {string} branch
  * @returns {boolean}
  */
+function isGrandfatheredBranch(branch) {
+  return GRANDFATHERED_BRANCHES.has(branch);
+}
+
+/**
+ * @param {string} branch
+ * @returns {boolean}
+ */
 function isAllowedBranchName(branch) {
   return (
     LONG_LIVED_BRANCHES.has(branch) ||
-    GRANDFATHERED_BRANCHES.has(branch) ||
+    isGrandfatheredBranch(branch) ||
     FEATURE_BRANCH.test(branch) ||
     HOTFIX_BRANCH.test(branch)
   );
@@ -85,6 +93,8 @@ function main() {
 module.exports = {
   checkBranchName,
   isAllowedBranchName,
+  isGrandfatheredBranch,
+  resolveBranchName,
 };
 
 if (require.main === module) {
