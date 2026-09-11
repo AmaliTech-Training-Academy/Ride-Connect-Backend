@@ -65,7 +65,7 @@ describe('test-only routes', () => {
     process.env.NODE_ENV = 'production';
     jest.resetModules();
 
-    const { app: appInNonTestEnv } = await import('./app');
+    const { app: appInNonTestEnv } = jest.requireActual('./app') as typeof import('./app');
     const response = await request(appInNonTestEnv).get('/__test/throw');
 
     expect(response.status).toBe(404);
