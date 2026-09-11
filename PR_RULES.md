@@ -2,7 +2,7 @@
 # RideConnect — Pull Request Rules
 
 **Project:** RideConnect (AmaliTech 6-Week Internship)
-**Applies to:** all pull requests into `prod`, `testing`, and `dev`
+**Applies to:** all pull requests into `main` (prod), `testing`, and `develop` (dev)
 **Status:** draft for reviewer kick-off · **Revisit at:** end of Week 3 retro
 
 > Items marked **[PRD]** are mandated by the RideConnect PRD.
@@ -20,7 +20,7 @@
 
 - **Branch naming:** `feat/<us-id>-short-desc`
 - **Commit messages** follow Conventional Commits — `feat:`, `fix:`, `chore:`, `test:`, `docs:`, `refactor:` `[PRD — NFR: Code Quality]`
-- **Mandatory branches:** `prod`, `testing`, `dev` — all three exist for the life of the project and are **protected**.
+- **Mandatory branches:** `main` (prod), `testing`, and `develop` (dev) — all three exist for the life of the project and are **protected**.
 - **No direct pushes** to protected branches. Merge only via PR + 1 approval + green CI.
 - **Branch and commit naming conventions are enforced**, not advisory — CI rejects non-conforming names (commitlint / branch-name check).
 
@@ -29,18 +29,18 @@
 Work flows in one direction only. No skipping stages, no reverse merges except hotfixes.
 
 ```
-feat/<us-id>-short-desc  →  dev  →  testing  →  prod
+feat/<us-id>-short-desc  →  develop  →  testing  →  main
 ```
 
-| Merge                   | Approvals                 | CI        | Notes                                                                      |
-| ----------------------- | ------------------------- | --------- | -------------------------------------------------------------------------- |
-| `feat/*` → `dev`   | 1 (area reviewer)         | must pass | the normal review gate; this is where feedback happens                     |
-| `dev` → `testing`  | 0 — team lead promotes   | must pass | batch promotion at the end of a sprint or when a slice is feature-complete |
-| `testing` → `prod` | 1 (reviewer or team lead) | must pass | release only; nothing merges here that hasn't sat in`testing`            |
+| Merge                      | Approvals                | CI        | Notes                                                                         |
+| -------------------------- | ------------------------ | --------- | ----------------------------------------------------------------------------- |
+| `feat/*` → `develop`       | 1 (area reviewer)        | must pass | the normal review gate; this is where feedback happens                        |
+| `develop` → `testing`      | 0 — team lead promotes   | must pass | batch promotion at the end of a sprint or when a slice is feature-complete    |
+| `testing` → `main`         | 1 (reviewer or team lead) | must pass | release only; nothing merges here that hasn't sat in `testing`              |
 
-- **Hotfixes:** branch `fix/<short-desc>` off `prod`, PR into `prod` with 1 approval, then merge `prod` back down into `testing` and `dev` the same day so the branches don't diverge.
+- **Hotfixes:** branch `fix/<short-desc>` off `main`, PR into `main` with 1 approval, then merge `main` back down into `testing` and `develop` the same day so the branches don't diverge.
 - Feature branches are **deleted after merge**; keep the branch list readable.
-- Rebase or merge `dev` into your feature branch to resolve conflicts — never the other way round.
+- Rebase or merge `develop` into your feature branch to resolve conflicts — never the other way round.
 
 ## 4. Definition of Done
 
