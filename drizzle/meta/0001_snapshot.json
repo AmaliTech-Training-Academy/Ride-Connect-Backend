@@ -112,12 +112,8 @@
           "name": "account_user_id_users_id_fk",
           "tableFrom": "account",
           "tableTo": "users",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -211,12 +207,8 @@
           "name": "ride_requests_ride_id_rides_id_fk",
           "tableFrom": "ride_requests",
           "tableTo": "rides",
-          "columnsFrom": [
-            "ride_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["ride_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -224,12 +216,8 @@
           "name": "ride_requests_passenger_id_users_id_fk",
           "tableFrom": "ride_requests",
           "tableTo": "users",
-          "columnsFrom": [
-            "passenger_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["passenger_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -239,10 +227,7 @@
         "unique_ride_request": {
           "name": "unique_ride_request",
           "nullsNotDistinct": false,
-          "columns": [
-            "ride_id",
-            "passenger_id"
-          ]
+          "columns": ["ride_id", "passenger_id"]
         }
       },
       "policies": {},
@@ -371,12 +356,8 @@
           "name": "rides_driver_id_users_id_fk",
           "tableFrom": "rides",
           "tableTo": "users",
-          "columnsFrom": [
-            "driver_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["driver_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -493,12 +474,8 @@
           "name": "session_user_id_users_id_fk",
           "tableFrom": "session",
           "tableTo": "users",
-          "columnsFrom": [
-            "user_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["user_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -508,9 +485,7 @@
         "session_token_unique": {
           "name": "session_token_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "token"
-          ]
+          "columns": ["token"]
         }
       },
       "policies": {},
@@ -575,9 +550,7 @@
         "users_email_unique": {
           "name": "users_email_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "email"
-          ]
+          "columns": ["email"]
         }
       },
       "policies": {},
@@ -641,22 +614,12 @@
     "public.request_status": {
       "name": "request_status",
       "schema": "public",
-      "values": [
-        "PENDING",
-        "ACCEPTED",
-        "DECLINED",
-        "WITHDRAWN"
-      ]
+      "values": ["PENDING", "ACCEPTED", "DECLINED", "WITHDRAWN"]
     },
     "public.ride_status": {
       "name": "ride_status",
       "schema": "public",
-      "values": [
-        "OPEN",
-        "FULL",
-        "CANCELLED",
-        "COMPLETED"
-      ]
+      "values": ["OPEN", "FULL", "CANCELLED", "COMPLETED"]
     }
   },
   "schemas": {},

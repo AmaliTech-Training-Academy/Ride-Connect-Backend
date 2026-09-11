@@ -14,15 +14,11 @@ import { vi } from 'vitest';
 const testDatabaseUrl = process.env.TEST_DATABASE_URL;
 
 if (!testDatabaseUrl) {
-  throw new Error(
-    "TEST_DATABASE_URL is not set. Copy .env.example to .env and fill it in.",
-  );
+  throw new Error('TEST_DATABASE_URL is not set. Copy .env.example to .env and fill it in.');
 }
 
 if (testDatabaseUrl === process.env.DATABASE_URL) {
-  throw new Error(
-    "TEST_DATABASE_URL must differ from DATABASE_URL; the suite truncates tables.",
-  );
+  throw new Error('TEST_DATABASE_URL must differ from DATABASE_URL; the suite truncates tables.');
 }
 
 process.env.DATABASE_URL = testDatabaseUrl;
