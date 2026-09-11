@@ -1,4 +1,3 @@
-
 # RideConnect — Pull Request Rules
 
 **Project:** RideConnect (AmaliTech 6-Week Internship)
@@ -32,11 +31,11 @@ Work flows in one direction only. No skipping stages, no reverse merges except h
 feat/<us-id>-short-desc  →  develop  →  testing  →  main
 ```
 
-| Merge                      | Approvals                | CI        | Notes                                                                         |
-| -------------------------- | ------------------------ | --------- | ----------------------------------------------------------------------------- |
-| `feat/*` → `develop`       | 1 (area reviewer)        | must pass | the normal review gate; this is where feedback happens                        |
-| `develop` → `testing`      | 0 — team lead promotes   | must pass | batch promotion at the end of a sprint or when a slice is feature-complete    |
-| `testing` → `main`         | 1 (reviewer or team lead) | must pass | release only; nothing merges here that hasn't sat in `testing`              |
+| Merge                 | Approvals                 | CI        | Notes                                                                      |
+| --------------------- | ------------------------- | --------- | -------------------------------------------------------------------------- |
+| `feat/*` → `develop`  | 1 (area reviewer)         | must pass | the normal review gate; this is where feedback happens                     |
+| `develop` → `testing` | 0 — team lead promotes    | must pass | batch promotion at the end of a sprint or when a slice is feature-complete |
+| `testing` → `main`    | 1 (reviewer or team lead) | must pass | release only; nothing merges here that hasn't sat in `testing`             |
 
 - **Hotfixes:** branch `fix/<short-desc>` off `main`, PR into `main` with 1 approval, then merge `main` back down into `testing` and `develop` the same day so the branches don't diverge.
 - Feature branches are **deleted after merge**; keep the branch list readable.
@@ -57,7 +56,7 @@ A PR is **mergeable** when:
 
 ## 5. Turnaround
 
-- **Reviewer:** first response within **1 business day** of a PR being marked *Ready for review*.
+- **Reviewer:** first response within **1 business day** of a PR being marked _Ready for review_.
 - **Author:** respond to review comments within **1 business day**.
 - **No PR sits more than 3 days without action.**
 - PRs opened after **Fri 15:00** may roll to the next working day.
@@ -66,11 +65,11 @@ A PR is **mergeable** when:
 
 So authors know what is required versus optional:
 
-| Label          | Meaning                              |
-| -------------- | ------------------------------------ |
+| Label        | Meaning                              |
+| ------------ | ------------------------------------ |
 | `[blocking]` | Must fix before merge                |
 | `[should]`   | Fix now, or agree a follow-up ticket |
-| `[nit]`      | Optional — style or preference      |
+| `[nit]`      | Optional — style or preference       |
 
 ## 7. When a PR fails the rules
 
