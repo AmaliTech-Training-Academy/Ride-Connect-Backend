@@ -1,4 +1,5 @@
 import request from 'supertest';
+import { vi } from 'vitest';
 
 import { app } from './app';
 
@@ -15,10 +16,10 @@ describe('404 handler', () => {
 });
 
 describe('global error handler', () => {
-  let consoleErrorSpy: jest.SpyInstance;
+  let consoleErrorSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
-    consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => undefined);
+    consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
   });
 
   afterEach(() => {
@@ -58,14 +59,14 @@ describe('test-only routes', () => {
     } else {
       process.env.NODE_ENV = originalNodeEnv;
     }
-    jest.resetModules();
+    vi.resetModules();
   });
 
   it('are not mounted when NODE_ENV is not "test"', async () => {
     process.env.NODE_ENV = 'production';
-    jest.resetModules();
+    vi.resetModules();
 
-    const { app: appInNonTestEnv } = jest.requireActual('./app') as typeof import('./app');
+    const { app: appInNonTestEnv } = await import('./app.js');
     const response = await request(appInNonTestEnv).get('/__test/throw');
 
     expect(response.status).toBe(404);
