@@ -1,24 +1,37 @@
 import cors from 'cors';
-import express from 'express';
+import express, { type Express } from 'express';
 import helmet from 'helmet';
+import { toNodeHandler } from 'better-auth/node';
 
+import { auth } from './auth/auth.config';
 import { env } from './config/env';
 import { errorHandler } from './middlewares/errorHandler.middleware';
 import { notFoundHandler } from './middlewares/notFound.middleware';
+import { authRouter } from './routes/auth.routes';
 import { healthRouter } from './routes/health.routes';
 import { testOnlyRouter } from './routes/test-only.routes';
 
-export const app = express();
+export const createApp = (): Express => {
+  const app = express();
 
-app.use(helmet());
-app.use(cors());
-app.use(express.json());
+  app.disable('x-powered-by');
+  app.use(helmet());
+  app.use(cors());
 
-app.use(healthRouter);
+  app.all('/api/auth/*', toNodeHandler(auth));
+  app.use(express.json());
 
-if (env.nodeEnv === 'test') {
-  app.use(testOnlyRouter);
-}
+  app.use(healthRouter);
+  app.use(authRouter);
 
-app.use(notFoundHandler);
-app.use(errorHandler);
+  if (env.nodeEnv === 'test') {
+    app.use(testOnlyRouter);
+  }
+
+  app.use(notFoundHandler);
+  app.use(errorHandler);
+
+  return app;
+};
+
+export const app = createApp();

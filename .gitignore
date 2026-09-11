@@ -1,12 +1,24 @@
+# Dependencies
 node_modules/
+
+# Build output
 dist/
+
+# Environment — real secrets. Keep .env.example tracked.
 .env
+.env.local
+.env.*.local
+
+# Logs
 *.log
+npm-debug.log*
+
+# Test / coverage output
 coverage/
 
-.claude/skills/
-.agents/skills/
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
 
-CLAUDE.md
-AGENTS.md
 docs/

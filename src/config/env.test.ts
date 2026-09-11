@@ -1,3 +1,5 @@
+import { vi } from 'vitest';
+
 describe('env', () => {
   const originalPort = process.env.PORT;
   const originalNodeEnv = process.env.NODE_ENV;
@@ -13,41 +15,41 @@ describe('env', () => {
     } else {
       process.env.NODE_ENV = originalNodeEnv;
     }
-    jest.resetModules();
+    vi.resetModules();
   });
 
-  it('reads PORT from the environment when set', () => {
+  it('reads PORT from the environment when set', async () => {
     process.env.PORT = '4000';
-    jest.resetModules();
+    vi.resetModules();
 
-    const { env } = jest.requireActual('./env') as typeof import('./env');
+    const { env } = await import('./env.js');
 
     expect(env.port).toBe(4000);
   });
 
-  it('defaults to port 3000 when PORT is unset', () => {
+  it('defaults to port 3000 when PORT is unset', async () => {
     delete process.env.PORT;
-    jest.resetModules();
+    vi.resetModules();
 
-    const { env } = jest.requireActual('./env') as typeof import('./env');
+    const { env } = await import('./env.js');
 
     expect(env.port).toBe(3000);
   });
 
-  it('reads NODE_ENV from the environment when set', () => {
+  it('reads NODE_ENV from the environment when set', async () => {
     process.env.NODE_ENV = 'production';
-    jest.resetModules();
+    vi.resetModules();
 
-    const { env } = jest.requireActual('./env') as typeof import('./env');
+    const { env } = await import('./env.js');
 
     expect(env.nodeEnv).toBe('production');
   });
 
-  it('defaults nodeEnv to "development" when NODE_ENV is unset', () => {
+  it('defaults nodeEnv to "development" when NODE_ENV is unset', async () => {
     delete process.env.NODE_ENV;
-    jest.resetModules();
+    vi.resetModules();
 
-    const { env } = jest.requireActual('./env') as typeof import('./env');
+    const { env } = await import('./env.js');
 
     expect(env.nodeEnv).toBe('development');
   });
