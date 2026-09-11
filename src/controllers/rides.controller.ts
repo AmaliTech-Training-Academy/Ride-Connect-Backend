@@ -1,3 +1,4 @@
+import { and, asc, eq, gte, ilike, lt, or } from 'drizzle-orm';
 import type { RequestHandler } from 'express';
 
 import { db } from '../db';
@@ -93,6 +94,46 @@ export const createRide: RequestHandler = async (req, res, next) => {
       .returning();
 
     res.status(201).json({ ride });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const listRides: RequestHandler = async (req, res, next) => {
+  try {
+    const { date, search } = req.query;
+
+    const conditions = [eq(rides.status, 'OPEN')];
+
+    if (typeof date === 'string' && date.trim().length > 0) {
+      const dayStart = new Date(`${date}T00:00:00`);
+
+      if (Number.isNaN(dayStart.getTime())) {
+        res.status(400).json({ error: { message: 'Invalid date. Use YYYY-MM-DD.' } });
+        return;
+      }
+
+      const dayEnd = new Date(dayStart);
+      dayEnd.setDate(dayEnd.getDate() + 1);
+
+      conditions.push(gte(rides.departureAt, dayStart), lt(rides.departureAt, dayEnd));
+    }
+
+    if (typeof search === 'string' && search.trim().length > 0) {
+      const keyword = `%${search.trim()}%`;
+      const routeMatch = or(ilike(rides.origin, keyword), ilike(rides.destination, keyword));
+      if (routeMatch) {
+        conditions.push(routeMatch);
+      }
+    }
+
+    const results = await db
+      .select()
+      .from(rides)
+      .where(and(...conditions))
+      .orderBy(asc(rides.departureAt));
+
+    res.status(200).json({ rides: results });
   } catch (error) {
     next(error);
   }
