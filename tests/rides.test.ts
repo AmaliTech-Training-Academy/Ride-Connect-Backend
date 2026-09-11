@@ -1,7 +1,10 @@
+import { eq } from 'drizzle-orm';
 import request from 'supertest';
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 
 import { createApp } from '../src/app';
+import { db } from '../src/db';
+import { rides } from '../src/db/schema';
 import { closeDb, resetAuthTables, uniqueEmail } from './helpers';
 
 const app = createApp();
@@ -21,9 +24,13 @@ async function registerDriver(): Promise<string> {
   return Array.isArray(cookie) ? cookie.join('; ') : cookie;
 }
 
-function tomorrow(): { date: string; time: string } {
-  const date = new Date(Date.now() + 24 * 60 * 60 * 1000);
+function daysFromNow(n: number): { date: string; time: string } {
+  const date = new Date(Date.now() + n * 24 * 60 * 60 * 1000);
   return { date: date.toISOString().slice(0, 10), time: '09:30' };
+}
+
+function tomorrow(): { date: string; time: string } {
+  return daysFromNow(1);
 }
 
 function validRide(): Record<string, unknown> {
@@ -35,6 +42,18 @@ function validRide(): Record<string, unknown> {
     departureTime: time,
     availableSeats: 3,
   };
+}
+
+/** Creates a ride via the real POST /rides endpoint, as a fresh driver. Returns the created ride. */
+async function postRide(overrides: Record<string, unknown> = {}): Promise<{ id: string; driverId: string }> {
+  const cookie = await registerDriver();
+  const response = await request(app)
+    .post('/rides')
+    .set('Cookie', cookie)
+    .send({ ...validRide(), ...overrides });
+
+  expect(response.status).toBe(201);
+  return response.body.ride;
 }
 
 beforeEach(async () => {
@@ -117,5 +136,54 @@ describe('POST /rides', () => {
 
     expect(response.status).toBe(400);
     expect(response.body.error.fields.destination).toBeDefined();
+  });
+});
+
+describe('GET /rides', () => {
+  it('lists open rides by default, without requiring auth', async () => {
+    await postRide({ origin: 'Accra', destination: 'Kumasi' });
+    const cancelled = await postRide({ origin: 'Tema', destination: 'Ho' });
+    await db.update(rides).set({ status: 'CANCELLED' }).where(eq(rides.id, cancelled.id));
+
+    const response = await request(app).get('/rides');
+
+    expect(response.status).toBe(200);
+    expect(response.body.rides).toHaveLength(1);
+    expect(response.body.rides[0]).toMatchObject({ origin: 'Accra', status: 'OPEN' });
+  });
+
+  it('filters by departure date, returning only rides on that date', async () => {
+    const day1 = daysFromNow(1);
+    const day2 = daysFromNow(2);
+
+    await postRide({ origin: 'Accra', destination: 'Kumasi', ...day1 });
+    await postRide({ origin: 'Tema', destination: 'Ho', ...day2 });
+
+    const response = await request(app).get('/rides').query({ date: day1.date });
+
+    expect(response.status).toBe(200);
+    expect(response.body.rides).toHaveLength(1);
+    expect(response.body.rides[0]).toMatchObject({ origin: 'Accra' });
+  });
+
+  it('searches by route keyword, matching origin or destination case-insensitively', async () => {
+    await postRide({ origin: 'Accra', destination: 'Kumasi' });
+    await postRide({ origin: 'Takoradi', destination: 'Accra' });
+    await postRide({ origin: 'Tema', destination: 'Ho' });
+
+    const response = await request(app).get('/rides').query({ search: 'ACCRA' });
+
+    expect(response.status).toBe(200);
+    expect(response.body.rides).toHaveLength(2);
+  });
+
+  it('returns an empty list when nothing matches the date filter', async () => {
+    await postRide();
+
+    const farOut = daysFromNow(30);
+    const response = await request(app).get('/rides').query({ date: farOut.date });
+
+    expect(response.status).toBe(200);
+    expect(response.body.rides).toEqual([]);
   });
 });
