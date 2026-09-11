@@ -22,8 +22,12 @@ describe('isAllowedBranchName', () => {
     },
   );
 
+  it('accepts the grandfathered pre-rules branch', () => {
+    expect(isAllowedBranchName('chore/initial-boilerplate-setup')).toBe(true);
+  });
+
   it.each([
-    'chore/initial-boilerplate-setup',
+    'chore/another-setup',
     'feat/RID-1-authentication-and-db-setup',
     'feat/us1',
     'feat/us8-out-of-range',
@@ -51,11 +55,9 @@ describe('checkBranchName', () => {
   it('returns 1 and prints the rule for a rejected branch', () => {
     const write = jest.fn();
 
-    expect(checkBranchName({ branch: 'chore/initial-boilerplate-setup', write })).toBe(1);
+    expect(checkBranchName({ branch: 'chore/another-setup', write })).toBe(1);
     expect(write).toHaveBeenCalledTimes(1);
-    expect(write.mock.calls[0][0]).toContain(
-      'Invalid branch name: "chore/initial-boilerplate-setup"',
-    );
+    expect(write.mock.calls[0][0]).toContain('Invalid branch name: "chore/another-setup"');
     expect(write.mock.calls[0][0]).toContain('feat/<us-id>-short-desc');
     expect(write.mock.calls[0][0]).toContain('main (prod), develop (dev), testing');
   });
