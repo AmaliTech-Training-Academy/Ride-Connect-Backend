@@ -6,3 +6,7 @@ coverage/
 
 .claude/skills/
 .agents/skills/
+
+CLAUDE.md
+AGENTS.md
+docs/
