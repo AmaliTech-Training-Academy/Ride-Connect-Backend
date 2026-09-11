@@ -1,0 +1,9 @@
+node_modules
+dist
+coverage
+.agents
+.claude
+docs
+AGENTS.md
+CLAUDE.md
+README.md
