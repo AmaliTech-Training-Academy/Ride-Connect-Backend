@@ -21,9 +21,4 @@ coverage/
 .idea/
 .vscode/
 
-.claude/skills/
-.agents/skills/
-
-CLAUDE.md
-AGENTS.md
 docs/
