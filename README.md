@@ -5,7 +5,7 @@ API for Ride Connect — an employee carpooling platform where colleagues can of
 
 ## Scope
 
-- **Authentication** — register and log in with a work email
+- **Authentication** — register and log in with an email address and password
 - **Rides** — post, browse/search, join requests, and ride status management
 - **Dashboard** — rides you’re driving and rides you’ve joined
 - **Notifications** — in-app alerts for join requests, acceptances, declines, cancellations, and related updates
