@@ -11,7 +11,6 @@ import { responseMiddleware } from './middlewares/response.middleware';
 import { authRouter } from './routes/auth.routes';
 import { healthRouter } from './routes/health.routes';
 import { ridesRouter } from './routes/rides.routes';
-import { testOnlyRouter } from './routes/test-only.routes';
 
 export const createApp = (): Express => {
   const app = express();
@@ -27,10 +26,6 @@ export const createApp = (): Express => {
   app.use(healthRouter);
   app.use(authRouter);
   app.use(ridesRouter);
-
-  if (env.NODE_ENV === 'test') {
-    app.use(testOnlyRouter);
-  }
 
   app.use(notFoundHandler);
   app.use(errorHandler);
