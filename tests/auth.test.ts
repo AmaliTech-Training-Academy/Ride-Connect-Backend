@@ -51,7 +51,8 @@ describe('POST /register', () => {
       .send({ name: 'Grace Hopper', email: uniqueEmail('ac1-short'), password: 'abc1234' });
 
     expect(response.status).toBe(400);
-    expect(response.body.error.code).toBe('PASSWORD_TOO_SHORT');
+    expect(response.body.success).toBe(false);
+    expect(response.body.data.code).toBe('PASSWORD_TOO_SHORT');
   });
 
   it('AC2: returns 409 with a distinct error when the email is already used', async () => {
@@ -63,10 +64,11 @@ describe('POST /register', () => {
       .send({ name: 'Grace Hopper', email, password: VALID_PASSWORD });
 
     expect(response.status).toBe(409);
-    expect(response.body.error.code).toBe('USER_ALREADY_EXISTS_USE_ANOTHER_EMAIL');
-    expect(response.body.error.message).toMatch(/already exists/i);
+    expect(response.body.success).toBe(false);
+    expect(response.body.data.code).toBe('USER_ALREADY_EXISTS_USE_ANOTHER_EMAIL');
+    expect(response.body.message).toMatch(/already exists/i);
 
-    expect(response.body.error.message).not.toBe('Invalid email or password');
+    expect(response.body.message).not.toBe('Invalid email or password');
   });
 
   it('AC2: does not create a second user row for a duplicate email', async () => {
@@ -123,7 +125,8 @@ describe('POST /login', () => {
       .send({ email, password: 'definitely-not-it' });
 
     expect(response.status).toBe(401);
-    expect(response.body.error.message).toBe('Invalid email or password');
+    expect(response.body.message).toBe('Invalid email or password');
+    expect(response.body.data).toBeUndefined();
   });
 
   it('AC4: returns the generic message for an unknown email', async () => {
@@ -132,7 +135,8 @@ describe('POST /login', () => {
       .send({ email: uniqueEmail('ac4-unknown'), password: VALID_PASSWORD });
 
     expect(response.status).toBe(401);
-    expect(response.body.error.message).toBe('Invalid email or password');
+    expect(response.body.message).toBe('Invalid email or password');
+    expect(response.body.data).toBeUndefined();
   });
 
   it('AC4: wrong password and unknown email are indistinguishable', async () => {
