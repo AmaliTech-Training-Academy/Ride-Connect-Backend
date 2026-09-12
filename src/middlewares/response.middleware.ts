@@ -8,7 +8,6 @@ export interface ResponsePayload {
 }
 
 declare global {
-  // Express publishes its types as a namespace; augmenting Response needs one too.
   // eslint-disable-next-line @typescript-eslint/no-namespace
   namespace Express {
     interface Response {
@@ -35,13 +34,7 @@ const send =
     });
   };
 
-/**
- * Attaches the four envelope helpers to every response.
- *
- * Mounted ahead of `express.json()`: a malformed body makes the parser throw,
- * which skips the remaining non-error middleware, and the error handler still
- * needs the helpers to report it.
- */
+/** Attaches the four envelope helpers. Mount before anything that can throw. */
 export const responseMiddleware = (_req: Request, res: Response, next: NextFunction): void => {
   res.customSuccess = send(res, 200, true, 'Request was successful');
   res.customInvalid = send(res, 400, false, 'The request is invalid');

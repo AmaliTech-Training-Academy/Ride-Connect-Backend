@@ -46,9 +46,7 @@ const toCustomError = (err: unknown): CustomError | undefined => {
     const mapped = code ? authErrorMap[code] : undefined;
     const status = mapped?.status ?? err.statusCode;
     const message = mapped?.message ?? err.body?.message ?? 'Authentication request failed.';
-    // A 401 must not reveal whether the email or the password was wrong, and the
-    // two better-auth codes behind it differ. Withholding the code is what keeps
-    // the two responses byte-identical.
+    // Codes differ between a wrong password and an unknown email; a 401 must not.
     const details = code && status !== 401 ? { code } : undefined;
 
     return new CustomError(status, message, details);

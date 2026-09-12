@@ -7,8 +7,6 @@ import { RIDE_ERROR_MESSAGES } from './rides.messages';
 const MIN_SEATS = 1;
 const MAX_SEATS = 8;
 
-// Arrays, because PR 4 replaces this block with zod's `flattenError().fieldErrors`,
-// which reports every failure per field rather than only the first.
 interface RideFieldErrors {
   origin?: string[];
   destination?: string[];
