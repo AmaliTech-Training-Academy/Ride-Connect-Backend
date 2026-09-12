@@ -11,7 +11,7 @@ const VALID_PASSWORD = 'careful-horse-8';
 /** Registers a new driver and returns their session cookie (better-auth auto-signs-in on register). */
 async function registerDriver(): Promise<string> {
   const response = await request(app)
-    .post('/register')
+    .post('/api/register')
     .send({ name: 'Grace Hopper', email: uniqueEmail('driver'), password: VALID_PASSWORD });
 
   const cookie = response.headers['set-cookie'];
@@ -49,7 +49,7 @@ describe('POST /rides', () => {
   it('creates a ride with status OPEN when all fields are valid', async () => {
     const cookie = await registerDriver();
 
-    const response = await request(app).post('/rides').set('Cookie', cookie).send(validRide());
+    const response = await request(app).post('/api/rides').set('Cookie', cookie).send(validRide());
 
     expect(response.status).toBe(201);
     expect(response.body.success).toBe(true);
@@ -64,7 +64,7 @@ describe('POST /rides', () => {
   });
 
   it('rejects an unauthenticated request', async () => {
-    const response = await request(app).post('/rides').send(validRide());
+    const response = await request(app).post('/api/rides').send(validRide());
 
     expect(response.status).toBe(401);
     expect(response.body).toEqual({
@@ -76,7 +76,7 @@ describe('POST /rides', () => {
   it('rejects a submission missing all required fields', async () => {
     const cookie = await registerDriver();
 
-    const response = await request(app).post('/rides').set('Cookie', cookie).send({});
+    const response = await request(app).post('/api/rides').set('Cookie', cookie).send({});
 
     expect(response.status).toBe(400);
     expect(response.body.data.fields).toMatchObject({
@@ -92,7 +92,7 @@ describe('POST /rides', () => {
     const cookie = await registerDriver();
 
     const response = await request(app)
-      .post('/rides')
+      .post('/api/rides')
       .set('Cookie', cookie)
       .send({ ...validRide(), availableSeats: 9 });
 
@@ -105,7 +105,7 @@ describe('POST /rides', () => {
     const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 
     const response = await request(app)
-      .post('/rides')
+      .post('/api/rides')
       .set('Cookie', cookie)
       .send({ ...validRide(), departureDate: yesterday });
 
@@ -117,7 +117,7 @@ describe('POST /rides', () => {
     const cookie = await registerDriver();
 
     const response = await request(app)
-      .post('/rides')
+      .post('/api/rides')
       .set('Cookie', cookie)
       .send({ ...validRide(), destination: 'accra' });
 

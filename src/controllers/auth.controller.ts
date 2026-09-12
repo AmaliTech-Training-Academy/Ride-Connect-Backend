@@ -18,7 +18,7 @@ function forwardAuthCookies(res: Response, headers: Headers): void {
   }
 }
 
-/** POST /register — creates an account and signs the new user straight in. */
+/** POST /api/register — creates an account and signs the new user straight in. */
 export const register = controller<{ body: RegisterInput }>(async (req, res) => {
   const { name, email, password } = req.validated.body;
 
@@ -40,7 +40,7 @@ export const register = controller<{ body: RegisterInput }>(async (req, res) => 
   });
 });
 
-/** POST /login — signs an existing user in. */
+/** POST /api/login — signs an existing user in. */
 export const login = controller<{ body: LoginInput }>(async (req, res) => {
   const { email, password } = req.validated.body;
 
