@@ -2,8 +2,8 @@ import { app } from './app';
 import { env } from './config/env';
 import { pool } from './db';
 
-const server = app.listen(env.port, () => {
-  console.log(`Server listening on port ${env.port}`);
+const server = app.listen(env.PORT, () => {
+  console.log(`Server listening on port ${env.PORT}`);
 });
 
 const shutdown = async (signal: string): Promise<void> => {

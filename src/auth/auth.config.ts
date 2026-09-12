@@ -8,25 +8,15 @@
 import { betterAuth } from 'better-auth';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
 
+import { env } from '../config/env';
 import { db, schema } from '../db';
-
-const secret = process.env.BETTER_AUTH_SECRET;
-const baseURL = process.env.BETTER_AUTH_URL;
-
-if (!secret) {
-  throw new Error('BETTER_AUTH_SECRET is not set. Copy .env.example to .env and fill it in.');
-}
-
-if (!baseURL) {
-  throw new Error('BETTER_AUTH_URL is not set. Copy .env.example to .env and fill it in.');
-}
 
 export const MIN_PASSWORD_LENGTH = 8;
 
 export const auth = betterAuth({
   appName: 'RideConnect',
-  secret,
-  baseURL,
+  secret: env.BETTER_AUTH_SECRET,
+  baseURL: env.BETTER_AUTH_URL,
 
   database: drizzleAdapter(db, {
     provider: 'pg',
