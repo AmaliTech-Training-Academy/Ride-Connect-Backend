@@ -186,4 +186,11 @@ describe('GET /rides', () => {
     expect(response.status).toBe(200);
     expect(response.body.rides).toEqual([]);
   });
+
+  it('rejects an invalid date format', async () => {
+    const response = await request(app).get('/rides').query({ date: 'not-a-date' });
+
+    expect(response.status).toBe(400);
+    expect(response.body.error.message).toMatch(/invalid date/i);
+  });
 });

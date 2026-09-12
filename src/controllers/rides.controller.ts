@@ -3,6 +3,7 @@ import type { RequestHandler } from 'express';
 
 import { db } from '../db';
 import { rides } from '../db/schema';
+import { sendJsonError } from '../utils/sendJsonError';
 import { RIDE_ERROR_MESSAGES } from './rides.messages';
 
 const MIN_SEATS = 1;
@@ -110,7 +111,7 @@ export const listRides: RequestHandler = async (req, res, next) => {
       const dayStart = new Date(`${date}T00:00:00`);
 
       if (Number.isNaN(dayStart.getTime())) {
-        res.status(400).json({ error: { message: 'Invalid date. Use YYYY-MM-DD.' } });
+        sendJsonError(res, 400, 'Invalid date. Use YYYY-MM-DD.');
         return;
       }
 
