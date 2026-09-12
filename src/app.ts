@@ -8,9 +8,7 @@ import { env } from './config/env';
 import { errorHandler } from './middlewares/errorHandler.middleware';
 import { notFoundHandler } from './middlewares/notFound.middleware';
 import { responseMiddleware } from './middlewares/response.middleware';
-import { authRouter } from './routes/auth.routes';
-import { healthRouter } from './routes/health.routes';
-import { ridesRouter } from './routes/rides.routes';
+import { apiRouter } from './routes';
 
 export const createApp = (): Express => {
   const app = express();
@@ -23,9 +21,7 @@ export const createApp = (): Express => {
   app.all('/api/auth/*', toNodeHandler(auth));
   app.use(express.json());
 
-  app.use(healthRouter);
-  app.use(authRouter);
-  app.use(ridesRouter);
+  app.use('/api', apiRouter);
 
   app.use(notFoundHandler);
   app.use(errorHandler);

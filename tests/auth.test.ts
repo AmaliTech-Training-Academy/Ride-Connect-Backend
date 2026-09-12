@@ -11,7 +11,7 @@ const VALID_PASSWORD = 'careful-horse-8';
 
 async function registerUser(email: string, password = VALID_PASSWORD) {
   const response = await request(app)
-    .post('/register')
+    .post('/api/register')
     .send({ name: 'Grace Hopper', email, password });
 
   expect(response.status).toBe(201);
@@ -31,7 +31,7 @@ describe('POST /register', () => {
     const email = uniqueEmail('ac1');
 
     const response = await request(app)
-      .post('/register')
+      .post('/api/register')
       .send({ name: 'Grace Hopper', email, password: VALID_PASSWORD });
 
     expect(response.status).toBe(201);
@@ -47,7 +47,7 @@ describe('POST /register', () => {
 
   it('AC1: rejects a password shorter than 8 characters', async () => {
     const response = await request(app)
-      .post('/register')
+      .post('/api/register')
       .send({ name: 'Grace Hopper', email: uniqueEmail('ac1-short'), password: 'abc1234' });
 
     expect(response.status).toBe(400);
@@ -60,7 +60,7 @@ describe('POST /register', () => {
     await registerUser(email);
 
     const response = await request(app)
-      .post('/register')
+      .post('/api/register')
       .send({ name: 'Grace Hopper', email, password: VALID_PASSWORD });
 
     expect(response.status).toBe(409);
@@ -76,10 +76,10 @@ describe('POST /register', () => {
     const first = await registerUser(email);
 
     await request(app)
-      .post('/register')
+      .post('/api/register')
       .send({ name: 'Impostor', email, password: 'another-password-9' });
 
-    const login = await request(app).post('/login').send({ email, password: VALID_PASSWORD });
+    const login = await request(app).post('/api/login').send({ email, password: VALID_PASSWORD });
 
     expect(login.status).toBe(200);
     expect(login.body.data.user.id).toBe(first.body.data.user.id);
@@ -92,7 +92,7 @@ describe('POST /login', () => {
     const email = uniqueEmail('ac3');
     await registerUser(email);
 
-    const response = await request(app).post('/login').send({ email, password: VALID_PASSWORD });
+    const response = await request(app).post('/api/login').send({ email, password: VALID_PASSWORD });
 
     expect(response.status).toBe(200);
     expect(response.body.data.user).toMatchObject({ email });
@@ -109,7 +109,7 @@ describe('POST /login', () => {
     const email = uniqueEmail('ac3-noredirect');
     await registerUser(email);
 
-    const response = await request(app).post('/login').send({ email, password: VALID_PASSWORD });
+    const response = await request(app).post('/api/login').send({ email, password: VALID_PASSWORD });
 
     expect(response.status).toBe(200);
     expect(response.status).toBeLessThan(300);
@@ -121,7 +121,7 @@ describe('POST /login', () => {
     await registerUser(email);
 
     const response = await request(app)
-      .post('/login')
+      .post('/api/login')
       .send({ email, password: 'definitely-not-it' });
 
     expect(response.status).toBe(401);
@@ -131,7 +131,7 @@ describe('POST /login', () => {
 
   it('AC4: returns the generic message for an unknown email', async () => {
     const response = await request(app)
-      .post('/login')
+      .post('/api/login')
       .send({ email: uniqueEmail('ac4-unknown'), password: VALID_PASSWORD });
 
     expect(response.status).toBe(401);
@@ -144,11 +144,11 @@ describe('POST /login', () => {
     await registerUser(email);
 
     const wrongPassword = await request(app)
-      .post('/login')
+      .post('/api/login')
       .send({ email, password: 'definitely-not-it' });
 
     const unknownEmail = await request(app)
-      .post('/login')
+      .post('/api/login')
       .send({ email: uniqueEmail('ac4-missing'), password: VALID_PASSWORD });
 
     expect(wrongPassword.status).toBe(unknownEmail.status);
