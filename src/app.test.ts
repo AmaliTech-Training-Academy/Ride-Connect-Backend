@@ -10,7 +10,8 @@ describe('404 handler', () => {
     expect(response.status).toBe(404);
     expect(response.type).toBe('application/json');
     expect(response.body).toEqual({
-      error: { message: 'Route not found: GET /this-route-does-not-exist' },
+      success: false,
+      message: 'Not Found - GET /this-route-does-not-exist',
     });
   });
 });
@@ -31,7 +32,10 @@ describe('global error handler', () => {
 
     expect(response.status).toBe(500);
     expect(response.type).toBe('application/json');
-    expect(response.body).toEqual({ error: { message: 'Internal Server Error' } });
+    expect(response.body).toEqual({
+      success: false,
+      message: 'An internal server error occurred',
+    });
     expect(JSON.stringify(response.body)).not.toContain('.ts');
   });
 
@@ -39,7 +43,10 @@ describe('global error handler', () => {
     const response = await request(app).get('/__test/next-error');
 
     expect(response.status).toBe(500);
-    expect(response.body).toEqual({ error: { message: 'Internal Server Error' } });
+    expect(response.body).toEqual({
+      success: false,
+      message: 'An internal server error occurred',
+    });
   });
 
   it('delegates to the default Express handler instead of double-sending a response', async () => {
@@ -47,6 +54,18 @@ describe('global error handler', () => {
 
     expect(response.status).toBe(200);
     expect(response.text).toBe('partial response');
+  });
+});
+
+describe('malformed request bodies', () => {
+  it('reports a 400 rather than an authentication failure', async () => {
+    const response = await request(app)
+      .post('/this-route-does-not-exist')
+      .set('Content-Type', 'application/json')
+      .send('{');
+
+    expect(response.status).toBe(400);
+    expect(response.body).toEqual({ success: false, message: 'Malformed JSON body' });
   });
 });
 
