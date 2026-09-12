@@ -16,6 +16,7 @@ function forwardAuthCookies(res: Response, headers: Headers): void {
   }
 }
 
+/** POST /register — creates an account and signs the new user straight in. */
 export const register: RequestHandler = async (req, res, next) => {
   try {
     const { name, email, password } = req.body ?? {};
@@ -28,15 +29,20 @@ export const register: RequestHandler = async (req, res, next) => {
 
     forwardAuthCookies(res, headers);
 
-    res.status(201).json({
-      user: response.user,
-      token: response.token,
+    res.customSuccess({
+      status: 201,
+      message: 'Account created successfully',
+      data: {
+        user: response.user,
+        token: response.token,
+      },
     });
   } catch (error) {
     next(error);
   }
 };
 
+/** POST /login — signs an existing user in. */
 export const login: RequestHandler = async (req, res, next) => {
   try {
     const { email, password } = req.body ?? {};
@@ -49,10 +55,13 @@ export const login: RequestHandler = async (req, res, next) => {
 
     forwardAuthCookies(res, headers);
 
-    res.status(200).json({
-      user: response.user,
-      token: response.token,
-      redirectTo: POST_LOGIN_REDIRECT,
+    res.customSuccess({
+      message: 'Signed in successfully',
+      data: {
+        user: response.user,
+        token: response.token,
+        redirectTo: POST_LOGIN_REDIRECT,
+      },
     });
   } catch (error) {
     next(error);
