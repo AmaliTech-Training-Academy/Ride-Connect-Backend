@@ -9,6 +9,7 @@ import { errorHandler } from './middlewares/errorHandler.middleware';
 import { notFoundHandler } from './middlewares/notFound.middleware';
 import { authRouter } from './routes/auth.routes';
 import { healthRouter } from './routes/health.routes';
+import { ridesRouter } from './routes/rides.routes';
 import { testOnlyRouter } from './routes/test-only.routes';
 
 export const createApp = (): Express => {
@@ -23,6 +24,7 @@ export const createApp = (): Express => {
 
   app.use(healthRouter);
   app.use(authRouter);
+  app.use(ridesRouter);
 
   if (env.nodeEnv === 'test') {
     app.use(testOnlyRouter);
