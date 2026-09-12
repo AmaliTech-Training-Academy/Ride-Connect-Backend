@@ -2,6 +2,7 @@ import type { RequestHandler } from 'express';
 
 import { db } from '../db';
 import { rides } from '../db/schema';
+import { RIDE_ERROR_MESSAGES } from './rides.messages';
 
 const MIN_SEATS = 1;
 const MAX_SEATS = 8;
@@ -25,11 +26,11 @@ export const createRide: RequestHandler = async (req, res, next) => {
     const errors: RideFieldErrors = {};
 
     if (!isNonEmptyString(origin)) {
-      errors.origin = 'Origin is required.';
+      errors.origin = RIDE_ERROR_MESSAGES.ORIGIN_REQUIRED;
     }
 
     if (!isNonEmptyString(destination)) {
-      errors.destination = 'Destination is required.';
+      errors.destination = RIDE_ERROR_MESSAGES.DESTINATION_REQUIRED;
     }
 
     if (
@@ -37,15 +38,15 @@ export const createRide: RequestHandler = async (req, res, next) => {
       isNonEmptyString(destination) &&
       origin.trim().toLowerCase() === destination.trim().toLowerCase()
     ) {
-      errors.destination = 'Destination must be different from origin.';
+      errors.destination = RIDE_ERROR_MESSAGES.DESTINATION_SAME_AS_ORIGIN;
     }
 
     if (!isNonEmptyString(departureDate)) {
-      errors.departureDate = 'Departure date is required.';
+      errors.departureDate = RIDE_ERROR_MESSAGES.DEPARTURE_DATE_REQUIRED;
     }
 
     if (!isNonEmptyString(departureTime)) {
-      errors.departureTime = 'Departure time is required.';
+      errors.departureTime = RIDE_ERROR_MESSAGES.DEPARTURE_TIME_REQUIRED;
     }
 
     let departureAt: Date | undefined;
@@ -56,20 +57,20 @@ export const createRide: RequestHandler = async (req, res, next) => {
       const candidate = new Date(`${departureDate}T${departureTime}`);
 
       if (Number.isNaN(candidate.getTime())) {
-        errors.departureDate = 'Departure date or time is invalid.';
+        errors.departureDate = RIDE_ERROR_MESSAGES.DEPARTURE_DATETIME_INVALID;
       } else if (candidate.getTime() < Date.now()) {
-        errors.departureDate = 'Departure date cannot be in the past.';
+        errors.departureDate = RIDE_ERROR_MESSAGES.DEPARTURE_IN_PAST;
       } else {
         departureAt = candidate;
       }
     }
 
     if (availableSeats === undefined || availableSeats === null || availableSeats === '') {
-      errors.availableSeats = 'Available seats is required.';
+      errors.availableSeats = RIDE_ERROR_MESSAGES.AVAILABLE_SEATS_REQUIRED;
     } else {
       const seats = Number(availableSeats);
       if (!Number.isInteger(seats) || seats < MIN_SEATS || seats > MAX_SEATS) {
-        errors.availableSeats = `Available seats must be between ${MIN_SEATS} and ${MAX_SEATS}.`;
+        errors.availableSeats = RIDE_ERROR_MESSAGES.availableSeatsOutOfRange(MIN_SEATS, MAX_SEATS);
       }
     }
 
