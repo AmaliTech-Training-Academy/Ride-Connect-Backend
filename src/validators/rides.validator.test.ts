@@ -35,7 +35,7 @@ describe('createRideSchema', () => {
   it('trims the endpoints and coerces the seat count a form would send as text', () => {
     const ride = createRideSchema.parse(validRide({ origin: '  Accra  ', availableSeats: '3' }));
 
-    expect(ride).toMatchObject({ origin: 'Accra', destination: 'Kumasi', availableSeats: 3 });
+    expect(ride).toMatchObject({ origin: 'Accra', destination: 'Kumasi', seatsOffered: 3 });
   });
 
   it('drops keys the schema does not name', () => {

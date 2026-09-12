@@ -50,7 +50,7 @@ export const createRideSchema = z
   .transform((ride) => ({
     origin: ride.origin,
     destination: ride.destination,
-    availableSeats: ride.availableSeats,
+    seatsOffered: ride.availableSeats,
     departureAt: toDepartureInstant(ride.departureDate, ride.departureTime),
   }));
 
