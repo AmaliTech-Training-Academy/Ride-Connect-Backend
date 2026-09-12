@@ -5,7 +5,7 @@ import type { CreateRideInput } from '../validators/rides.validator';
 
 /** POST /rides — publishes a Ride the authenticated User is driving. */
 export const createRide = authedController<{ body: CreateRideInput }>(async (req, res) => {
-  const { origin, destination, departureAt, availableSeats } = req.validated.body;
+  const { origin, destination, departureAt, seatsOffered } = req.validated.body;
 
   const [ride] = await db
     .insert(rides)
@@ -14,8 +14,8 @@ export const createRide = authedController<{ body: CreateRideInput }>(async (req
       origin,
       destination,
       departureAt,
-      totalSeats: availableSeats,
-      availableSeats,
+      totalSeats: seatsOffered,
+      availableSeats: seatsOffered,
     })
     .returning();
 
