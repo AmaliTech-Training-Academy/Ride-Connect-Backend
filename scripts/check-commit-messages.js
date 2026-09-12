@@ -10,6 +10,7 @@ const { isGrandfatheredBranch, resolveBranchName } = require('./check-branch-nam
 function runCommitlint(argv) {
   const result = spawnSync('npx', ['--no', '--', 'commitlint', ...argv], {
     stdio: 'inherit',
+    shell: true,
   });
 
   if (result.error) {
