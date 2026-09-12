@@ -51,9 +51,11 @@ jobs:
           --health-retries=5
 
     env:
+      # Never connected to: tests/setup.ts overrides it with TEST_DATABASE_URL and
+      # refuses to run if the two match.
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/rideconnect_dev
       TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/rideconnect_test
-      BETTER_AUTH_SECRET: ci-test-secret
+      BETTER_AUTH_SECRET: ci-test-secret-not-used-outside-ci-0123456789
       BETTER_AUTH_URL: http://localhost:3000
 
     steps:
