@@ -52,7 +52,7 @@ describe('POST /register', () => {
 
     expect(response.status).toBe(400);
     expect(response.body.success).toBe(false);
-    expect(response.body.data.code).toBe('PASSWORD_TOO_SHORT');
+    expect(response.body.data.fields.password[0]).toMatch(/at least 8 characters/);
   });
 
   it('AC2: returns 409 with a distinct error when the email is already used', async () => {

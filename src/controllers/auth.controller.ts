@@ -3,6 +3,7 @@ import type { Response } from 'express';
 
 import { auth } from '../auth/auth.config';
 import { controller } from '../lib/http/controller';
+import type { LoginInput, RegisterInput } from '../validators/auth.validator';
 
 /**
  * Where a successfully authenticated client should navigate next. The redirect
@@ -18,8 +19,8 @@ function forwardAuthCookies(res: Response, headers: Headers): void {
 }
 
 /** POST /register — creates an account and signs the new user straight in. */
-export const register = controller(async (req, res) => {
-  const { name, email, password } = req.body ?? {};
+export const register = controller<{ body: RegisterInput }>(async (req, res) => {
+  const { name, email, password } = req.validated.body;
 
   const { headers, response } = await auth.api.signUpEmail({
     body: { name, email, password },
@@ -40,8 +41,8 @@ export const register = controller(async (req, res) => {
 });
 
 /** POST /login — signs an existing user in. */
-export const login = controller(async (req, res) => {
-  const { email, password } = req.body ?? {};
+export const login = controller<{ body: LoginInput }>(async (req, res) => {
+  const { email, password } = req.validated.body;
 
   const { headers, response } = await auth.api.signInEmail({
     body: { email, password },
