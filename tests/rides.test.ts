@@ -52,7 +52,8 @@ describe('POST /rides', () => {
     const response = await request(app).post('/rides').set('Cookie', cookie).send(validRide());
 
     expect(response.status).toBe(201);
-    expect(response.body.ride).toMatchObject({
+    expect(response.body.success).toBe(true);
+    expect(response.body.data).toMatchObject({
       origin: 'Accra',
       destination: 'Kumasi',
       totalSeats: 3,
@@ -77,12 +78,12 @@ describe('POST /rides', () => {
     const response = await request(app).post('/rides').set('Cookie', cookie).send({});
 
     expect(response.status).toBe(400);
-    expect(response.body.error.fields).toMatchObject({
-      origin: expect.any(String),
-      destination: expect.any(String),
-      departureDate: expect.any(String),
-      departureTime: expect.any(String),
-      availableSeats: expect.any(String),
+    expect(response.body.data.fields).toMatchObject({
+      origin: [expect.any(String)],
+      destination: [expect.any(String)],
+      departureDate: [expect.any(String)],
+      departureTime: [expect.any(String)],
+      availableSeats: [expect.any(String)],
     });
   });
 
@@ -95,7 +96,7 @@ describe('POST /rides', () => {
       .send({ ...validRide(), availableSeats: 9 });
 
     expect(response.status).toBe(400);
-    expect(response.body.error.fields.availableSeats).toMatch(/between 1 and 8/);
+    expect(response.body.data.fields.availableSeats[0]).toMatch(/between 1 and 8/);
   });
 
   it('rejects a departure date in the past', async () => {
@@ -108,7 +109,7 @@ describe('POST /rides', () => {
       .send({ ...validRide(), departureDate: yesterday });
 
     expect(response.status).toBe(400);
-    expect(response.body.error.fields.departureDate).toMatch(/past/);
+    expect(response.body.data.fields.departureDate[0]).toMatch(/past/);
   });
 
   it('rejects when origin and destination are the same', async () => {
@@ -120,6 +121,6 @@ describe('POST /rides', () => {
       .send({ ...validRide(), destination: 'accra' });
 
     expect(response.status).toBe(400);
-    expect(response.body.error.fields.destination).toBeDefined();
+    expect(response.body.data.fields.destination).toBeDefined();
   });
 });

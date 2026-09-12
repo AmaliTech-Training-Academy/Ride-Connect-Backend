@@ -35,11 +35,11 @@ describe('POST /register', () => {
       .send({ name: 'Grace Hopper', email, password: VALID_PASSWORD });
 
     expect(response.status).toBe(201);
-    expect(response.body.user).toMatchObject({
+    expect(response.body.data.user).toMatchObject({
       name: 'Grace Hopper',
       email,
     });
-    expect(response.body.user.id).toMatch(
+    expect(response.body.data.user.id).toMatch(
       /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
     );
     expect(JSON.stringify(response.body)).not.toContain(VALID_PASSWORD);
@@ -82,8 +82,8 @@ describe('POST /register', () => {
     const login = await request(app).post('/login').send({ email, password: VALID_PASSWORD });
 
     expect(login.status).toBe(200);
-    expect(login.body.user.id).toBe(first.body.user.id);
-    expect(login.body.user.name).toBe('Grace Hopper');
+    expect(login.body.data.user.id).toBe(first.body.data.user.id);
+    expect(login.body.data.user.name).toBe('Grace Hopper');
   });
 });
 
@@ -95,10 +95,10 @@ describe('POST /login', () => {
     const response = await request(app).post('/login').send({ email, password: VALID_PASSWORD });
 
     expect(response.status).toBe(200);
-    expect(response.body.user).toMatchObject({ email });
-    expect(typeof response.body.token).toBe('string');
-    expect(response.body.token.length).toBeGreaterThan(0);
-    expect(response.body.redirectTo).toBe(POST_LOGIN_REDIRECT);
+    expect(response.body.data.user).toMatchObject({ email });
+    expect(typeof response.body.data.token).toBe('string');
+    expect(response.body.data.token.length).toBeGreaterThan(0);
+    expect(response.body.data.redirectTo).toBe(POST_LOGIN_REDIRECT);
 
     const setCookie = response.headers['set-cookie'];
     expect(setCookie).toBeDefined();
