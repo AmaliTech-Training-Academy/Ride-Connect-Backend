@@ -1,5 +1,6 @@
 import { isAPIError } from 'better-auth/api';
 import type { NextFunction, Request, Response } from 'express';
+import { z } from 'zod';
 
 import { CustomError, sendCustomError } from '../lib/http/errors';
 
@@ -50,6 +51,10 @@ const toCustomError = (err: unknown): CustomError | undefined => {
     const details = code && status !== 401 ? { code } : undefined;
 
     return new CustomError(status, message, details);
+  }
+
+  if (err instanceof z.ZodError) {
+    return CustomError.badRequest(undefined, { fields: z.flattenError(err).fieldErrors });
   }
 
   if (isBodyParserError(err)) {
