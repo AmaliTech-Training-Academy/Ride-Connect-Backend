@@ -65,6 +65,10 @@ describe('POST /rides', () => {
     const response = await request(app).post('/rides').send(validRide());
 
     expect(response.status).toBe(401);
+    expect(response.body).toEqual({
+      success: false,
+      message: 'Authentication required. Please log in.',
+    });
   });
 
   it('rejects a submission missing all required fields', async () => {
