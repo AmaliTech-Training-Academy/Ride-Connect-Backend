@@ -57,4 +57,3 @@ export const auth = betterAuth({
 });
 
 export type Auth = typeof auth;
-export type Session = Auth['$Infer']['Session'];
