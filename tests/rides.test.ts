@@ -60,6 +60,7 @@ describe('POST /rides', () => {
       availableSeats: 3,
       status: 'OPEN',
     });
+    expect(response.body.data).not.toHaveProperty('updatedAt');
   });
 
   it('rejects an unauthenticated request', async () => {
