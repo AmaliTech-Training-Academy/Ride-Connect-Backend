@@ -1,0 +1,70 @@
+import express, { type Express } from 'express';
+import request from 'supertest';
+
+import { errorHandler } from './errorHandler.middleware';
+import { responseMiddleware } from './response.middleware';
+
+/** A rejected duplicate, carrying the internal fields `pg` attaches to one. */
+function uniqueViolation(): Error & { code: string; constraint: string; detail: string } {
+  return Object.assign(new Error('duplicate key value violates unique constraint'), {
+    code: '23505',
+    constraint: 'unique_ride_request',
+    detail: 'Key (ride_id, passenger_id)=(a, b) already exists.',
+  });
+}
+
+function buildApp(thrown: unknown): Express {
+  const app = express();
+
+  app.use(responseMiddleware);
+  app.get('/probe', () => {
+    throw thrown;
+  });
+  app.use(errorHandler);
+
+  return app;
+}
+
+describe('errorHandler', () => {
+  const originalConsoleError = console.error;
+
+  beforeEach(() => {
+    console.error = () => undefined;
+  });
+
+  afterEach(() => {
+    console.error = originalConsoleError;
+  });
+
+  it('answers 409 when a write loses a race against a unique constraint', async () => {
+    const response = await request(buildApp(uniqueViolation())).get('/probe');
+
+    expect(response.status).toBe(409);
+    expect(response.body).toEqual({
+      success: false,
+      message: 'Resource already exists',
+    });
+  });
+
+  it('keeps the constraint name and the offending values out of the response', async () => {
+    const response = await request(buildApp(uniqueViolation())).get('/probe');
+
+    const body = JSON.stringify(response.body);
+    expect(body).not.toContain('unique_ride_request');
+    expect(body).not.toContain('passenger_id');
+  });
+
+  it('leaves other database errors as 500s rather than reporting a conflict', async () => {
+    const foreignKeyViolation = Object.assign(new Error('insert or update violates foreign key'), {
+      code: '23503',
+    });
+
+    const response = await request(buildApp(foreignKeyViolation)).get('/probe');
+
+    expect(response.status).toBe(500);
+    expect(response.body).toEqual({
+      success: false,
+      message: 'An internal server error occurred',
+    });
+  });
+});
