@@ -17,7 +17,7 @@ export const createApp = (): Express => {
 
   app.disable('x-powered-by');
   app.use(helmet());
-  app.use(cors());
+  app.use(cors({ origin: env.TRUSTED_ORIGINS, credentials: true }));
 
   app.all('/api/auth/*', toNodeHandler(auth));
   app.use(express.json());
@@ -26,7 +26,7 @@ export const createApp = (): Express => {
   app.use(authRouter);
   app.use(ridesRouter);
 
-  if (env.nodeEnv === 'test') {
+  if (env.NODE_ENV === 'test') {
     app.use(testOnlyRouter);
   }
 

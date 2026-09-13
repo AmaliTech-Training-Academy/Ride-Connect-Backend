@@ -1,5 +1,5 @@
 const { isGrandfatheredBranch } = require('./check-branch-name');
-const { checkCommitMessages } = require('./check-commit-messages');
+const { checkCommitMessages, defaultRange, selectsInput } = require('./check-commit-messages');
 
 describe('isGrandfatheredBranch', () => {
   it('is true only for the pre-rules branch', () => {
@@ -52,5 +52,77 @@ describe('checkCommitMessages', () => {
         runCommitlint: lint,
       }),
     ).toBe(1);
+  });
+});
+
+describe('selectsInput', () => {
+  it('recognises the flags commitlint reads messages from', () => {
+    expect(selectsInput(['--edit', 'COMMIT_EDITMSG'])).toBe(true);
+    expect(selectsInput(['--from=HEAD~1', '--to=HEAD'])).toBe(true);
+    expect(selectsInput(['-l'])).toBe(true);
+  });
+
+  it('does not mistake other arguments for one', () => {
+    expect(selectsInput([])).toBe(false);
+    expect(selectsInput(['--verbose'])).toBe(false);
+  });
+});
+
+describe('defaultRange', () => {
+  it('measures from the first base branch that resolves', () => {
+    expect(defaultRange((base) => (base === 'develop' ? 'abc123' : null))).toEqual([
+      '--from',
+      'abc123',
+      '--to',
+      'HEAD',
+    ]);
+  });
+
+  it('falls back to main when develop is absent', () => {
+    expect(defaultRange((base) => (base === 'main' ? 'def456' : null))).toEqual([
+      '--from',
+      'def456',
+      '--to',
+      'HEAD',
+    ]);
+  });
+
+  it('falls back to the last commit when no base branch resolves', () => {
+    expect(defaultRange(() => null)).toEqual(['--last']);
+  });
+});
+
+describe('checkCommitMessages without a commit range', () => {
+  it('lints the default range rather than blocking on stdin', () => {
+    const write = jest.fn();
+    const lint = jest.fn(() => 0);
+
+    expect(
+      checkCommitMessages({
+        branch: 'feat/t1-project-scaffold',
+        argv: [],
+        write,
+        runCommitlint: lint,
+        defaultRange: () => ['--from', 'abc123', '--to', 'HEAD'],
+      }),
+    ).toBe(0);
+    expect(lint).toHaveBeenCalledWith(['--from', 'abc123', '--to', 'HEAD']);
+    expect(write).toHaveBeenCalledWith(
+      'No commit range given; linting --from abc123 --to HEAD.',
+    );
+  });
+
+  it('keeps flags the caller passed alongside the default range', () => {
+    const lint = jest.fn(() => 0);
+
+    checkCommitMessages({
+      branch: 'feat/t1-project-scaffold',
+      argv: ['--verbose'],
+      write: jest.fn(),
+      runCommitlint: lint,
+      defaultRange: () => ['--last'],
+    });
+
+    expect(lint).toHaveBeenCalledWith(['--last', '--verbose']);
   });
 });
