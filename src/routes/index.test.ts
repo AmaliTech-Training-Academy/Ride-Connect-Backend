@@ -2,9 +2,9 @@ import request from 'supertest';
 
 import { app } from '../app';
 
-describe('GET /health', () => {
+describe('GET /api/health', () => {
   it('returns 200 with uptime and timestamp', async () => {
-    const response = await request(app).get('/health');
+    const response = await request(app).get('/api/health');
 
     expect(response.status).toBe(200);
     expect(response.body).toEqual({

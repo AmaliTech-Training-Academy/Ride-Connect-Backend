@@ -1,4 +1,4 @@
-import express, { type Express } from 'express';
+import express, { type Express, type RequestHandler } from 'express';
 import request from 'supertest';
 
 import { errorHandler } from './errorHandler.middleware';
@@ -13,13 +13,11 @@ function uniqueViolation(): Error & { code: string; constraint: string; detail: 
   });
 }
 
-function buildApp(thrown: unknown): Express {
+function buildApp(handler: RequestHandler): Express {
   const app = express();
 
   app.use(responseMiddleware);
-  app.get('/probe', () => {
-    throw thrown;
-  });
+  app.get('/probe', handler);
   app.use(errorHandler);
 
   return app;
@@ -36,8 +34,54 @@ describe('errorHandler', () => {
     console.error = originalConsoleError;
   });
 
+  it('returns a consistent JSON 500 response for a synchronously thrown error, without leaking the stack trace', async () => {
+    const response = await request(
+      buildApp(() => {
+        throw new Error('Synchronous test error');
+      }),
+    ).get('/probe');
+
+    expect(response.status).toBe(500);
+    expect(response.type).toBe('application/json');
+    expect(response.body).toEqual({
+      success: false,
+      message: 'An internal server error occurred',
+    });
+    expect(JSON.stringify(response.body)).not.toContain('.ts');
+  });
+
+  it('returns a consistent JSON 500 response for an error passed to next()', async () => {
+    const response = await request(
+      buildApp((_req, _res, next) => {
+        next(new Error('Async test error'));
+      }),
+    ).get('/probe');
+
+    expect(response.status).toBe(500);
+    expect(response.body).toEqual({
+      success: false,
+      message: 'An internal server error occurred',
+    });
+  });
+
+  it('delegates to the default Express handler instead of double-sending a response', async () => {
+    const response = await request(
+      buildApp((_req, res, next) => {
+        res.status(200).send('partial response');
+        next(new Error('Error after the response was already sent'));
+      }),
+    ).get('/probe');
+
+    expect(response.status).toBe(200);
+    expect(response.text).toBe('partial response');
+  });
+
   it('answers 409 when a write loses a race against a unique constraint', async () => {
-    const response = await request(buildApp(uniqueViolation())).get('/probe');
+    const response = await request(
+      buildApp(() => {
+        throw uniqueViolation();
+      }),
+    ).get('/probe');
 
     expect(response.status).toBe(409);
     expect(response.body).toEqual({
@@ -47,7 +91,11 @@ describe('errorHandler', () => {
   });
 
   it('keeps the constraint name and the offending values out of the response', async () => {
-    const response = await request(buildApp(uniqueViolation())).get('/probe');
+    const response = await request(
+      buildApp(() => {
+        throw uniqueViolation();
+      }),
+    ).get('/probe');
 
     const body = JSON.stringify(response.body);
     expect(body).not.toContain('unique_ride_request');
@@ -59,7 +107,11 @@ describe('errorHandler', () => {
       code: '23503',
     });
 
-    const response = await request(buildApp(foreignKeyViolation)).get('/probe');
+    const response = await request(
+      buildApp(() => {
+        throw foreignKeyViolation;
+      }),
+    ).get('/probe');
 
     expect(response.status).toBe(500);
     expect(response.body).toEqual({

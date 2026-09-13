@@ -7,4 +7,4 @@ import { createRideSchema } from '../validators/rides.validator';
 
 export const ridesRouter = Router();
 
-ridesRouter.post('/rides', requireAuth, validate({ body: createRideSchema }), createRide);
+ridesRouter.post('/', requireAuth, validate({ body: createRideSchema }), createRide);
