@@ -10,7 +10,7 @@ export type SessionLookup = (req: Request) => Promise<AuthContext | null>;
 const lookupSession: SessionLookup = (req) =>
   auth.api.getSession({ headers: fromNodeHeaders(req.headers) });
 
-/** Builds a `requireAuth` over a given session lookup. */
+/** Rejects the request unless the lookup finds a valid session. */
 export const createRequireAuth =
   (lookup: SessionLookup = lookupSession): RequestHandler =>
   async (req, _res, next) => {
@@ -19,8 +19,7 @@ export const createRequireAuth =
     try {
       session = await lookup(req);
     } catch (error) {
-      // A failed lookup is an auth-store outage, not a missing session: telling a
-      // signed-in caller they are logged out would turn a blip into a mass logout.
+      // An outage is not a logout: a 401 here signs out every caller holding a valid session.
       next(error);
       return;
     }
@@ -34,7 +33,7 @@ export const createRequireAuth =
     next();
   };
 
-/** Builds an `optionalAuth` over a given session lookup. */
+/** Attaches the auth context when the lookup finds a session; never rejects. */
 export const createOptionalAuth =
   (lookup: SessionLookup = lookupSession): RequestHandler =>
   async (req, _res, next) => {
@@ -45,16 +44,11 @@ export const createOptionalAuth =
         req.auth = session;
       }
     } catch (error) {
-      // A route that opted into optional auth must still answer anonymous callers,
-      // so anonymous is the truthful answer here rather than a degraded one.
       console.warn('optionalAuth session lookup failed', error);
     }
 
     next();
   };
 
-/** Rejects the request unless a valid session cookie is present. */
 export const requireAuth = createRequireAuth();
-
-/** Attaches the auth context when a valid session cookie is present; never rejects. */
 export const optionalAuth = createOptionalAuth();
