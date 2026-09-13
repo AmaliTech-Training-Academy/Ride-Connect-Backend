@@ -3,6 +3,7 @@ import request from 'supertest';
 
 import { errorHandler } from '../../middlewares/errorHandler.middleware';
 import { responseMiddleware } from '../../middlewares/response.middleware';
+import { logger } from '../logger';
 import { authedController, controller } from './controller';
 import { CustomError } from './errors';
 import type { AuthContext } from './types';
@@ -39,14 +40,14 @@ function buildApp(mount: (app: Express) => void): Express {
 }
 
 describe('controller', () => {
-  const originalConsoleError = console.error;
+  const originalLoggerError = logger.error;
 
   beforeEach(() => {
-    console.error = () => undefined;
+    logger.error = () => undefined;
   });
 
   afterEach(() => {
-    console.error = originalConsoleError;
+    logger.error = originalLoggerError;
   });
 
   it('routes a rejected promise to the error handler instead of leaking it', async () => {

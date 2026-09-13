@@ -3,6 +3,7 @@ import type { NextFunction, Request, Response } from 'express';
 import { z } from 'zod';
 
 import { CustomError, sendCustomError } from '../lib/http/errors';
+import { logger } from '../lib/logger';
 
 const authErrorMap: Record<string, { status: number; message: string }> = {
   USER_ALREADY_EXISTS: {
@@ -90,7 +91,7 @@ export const errorHandler = (
     return;
   }
 
-  console.error(err);
+  logger.error(err);
 
   res.customFailure();
 };
