@@ -1,7 +1,8 @@
 import { fromNodeHeaders } from 'better-auth/node';
-import type { RequestHandler, Response } from 'express';
+import type { Response } from 'express';
 
 import { auth } from '../auth/auth.config';
+import { controller } from '../lib/http/controller';
 
 /**
  * Where a successfully authenticated client should navigate next. The redirect
@@ -17,53 +18,45 @@ function forwardAuthCookies(res: Response, headers: Headers): void {
 }
 
 /** POST /register — creates an account and signs the new user straight in. */
-export const register: RequestHandler = async (req, res, next) => {
-  try {
-    const { name, email, password } = req.body ?? {};
+export const register = controller(async (req, res) => {
+  const { name, email, password } = req.body ?? {};
 
-    const { headers, response } = await auth.api.signUpEmail({
-      body: { name, email, password },
-      headers: fromNodeHeaders(req.headers),
-      returnHeaders: true,
-    });
+  const { headers, response } = await auth.api.signUpEmail({
+    body: { name, email, password },
+    headers: fromNodeHeaders(req.headers),
+    returnHeaders: true,
+  });
 
-    forwardAuthCookies(res, headers);
+  forwardAuthCookies(res, headers);
 
-    res.customSuccess({
-      status: 201,
-      message: 'Account created successfully',
-      data: {
-        user: response.user,
-        token: response.token,
-      },
-    });
-  } catch (error) {
-    next(error);
-  }
-};
+  res.customSuccess({
+    status: 201,
+    message: 'Account created successfully',
+    data: {
+      user: response.user,
+      token: response.token,
+    },
+  });
+});
 
 /** POST /login — signs an existing user in. */
-export const login: RequestHandler = async (req, res, next) => {
-  try {
-    const { email, password } = req.body ?? {};
+export const login = controller(async (req, res) => {
+  const { email, password } = req.body ?? {};
 
-    const { headers, response } = await auth.api.signInEmail({
-      body: { email, password },
-      headers: fromNodeHeaders(req.headers),
-      returnHeaders: true,
-    });
+  const { headers, response } = await auth.api.signInEmail({
+    body: { email, password },
+    headers: fromNodeHeaders(req.headers),
+    returnHeaders: true,
+  });
 
-    forwardAuthCookies(res, headers);
+  forwardAuthCookies(res, headers);
 
-    res.customSuccess({
-      message: 'Signed in successfully',
-      data: {
-        user: response.user,
-        token: response.token,
-        redirectTo: POST_LOGIN_REDIRECT,
-      },
-    });
-  } catch (error) {
-    next(error);
-  }
-};
+  res.customSuccess({
+    message: 'Signed in successfully',
+    data: {
+      user: response.user,
+      token: response.token,
+      redirectTo: POST_LOGIN_REDIRECT,
+    },
+  });
+});
