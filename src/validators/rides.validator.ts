@@ -8,10 +8,6 @@ const SEATS_OUT_OF_RANGE = `Available seats must be between ${MIN_SEATS} and ${M
 const requiredOr = (required: string, malformed: string) => (issue: { input: unknown }) =>
   issue.input === undefined || issue.input === '' ? required : malformed;
 
-/**
- * Both halves of the departure arrive without a zone, so they are read as UTC rather
- * than as wall-clock time on whichever host happens to run the process.
- */
 const toDepartureInstant = (date: string, time: string): Date => new Date(`${date}T${time}Z`);
 
 export const createRideSchema = z

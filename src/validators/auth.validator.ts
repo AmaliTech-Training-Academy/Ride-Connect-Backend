@@ -12,10 +12,6 @@ export const registerSchema = z.object({
     .min(MIN_PASSWORD_LENGTH, `Password must be at least ${MIN_PASSWORD_LENGTH} characters.`),
 });
 
-/**
- * Login checks that a password was sent, never how long it is: a rejected sign-in
- * must look the same whatever the caller typed.
- */
 export const loginSchema = z.object({
   email,
   password: z.string('Password is required.').min(1, 'Password is required.'),
