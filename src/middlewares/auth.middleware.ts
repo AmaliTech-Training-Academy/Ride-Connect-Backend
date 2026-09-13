@@ -4,6 +4,7 @@ import type { Request, RequestHandler } from 'express';
 import { auth } from '../auth/auth.config';
 import { CustomError } from '../lib/http/errors';
 import type { AuthContext } from '../lib/http/types';
+import { logger } from '../lib/logger';
 
 export type SessionLookup = (req: Request) => Promise<AuthContext | null>;
 
@@ -44,7 +45,7 @@ export const createOptionalAuth =
         req.auth = session;
       }
     } catch (error) {
-      console.warn('optionalAuth session lookup failed', error);
+      logger.warn('optionalAuth session lookup failed', error);
     }
 
     next();

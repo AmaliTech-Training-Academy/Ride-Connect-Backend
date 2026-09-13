@@ -2,6 +2,7 @@ import express, { type Express, type RequestHandler } from 'express';
 import request from 'supertest';
 
 import type { AuthContext } from '../lib/http/types';
+import { logger } from '../lib/logger';
 import { createOptionalAuth, createRequireAuth, type SessionLookup } from './auth.middleware';
 import { errorHandler } from './errorHandler.middleware';
 import { responseMiddleware } from './response.middleware';
@@ -44,14 +45,14 @@ function buildApp(middleware: RequestHandler): Express {
 }
 
 describe('requireAuth', () => {
-  const originalConsoleError = console.error;
+  const originalLoggerError = logger.error;
 
   beforeEach(() => {
-    console.error = () => undefined;
+    logger.error = () => undefined;
   });
 
   afterEach(() => {
-    console.error = originalConsoleError;
+    logger.error = originalLoggerError;
   });
 
   it('attaches the auth context when the lookup finds a session', async () => {
@@ -83,18 +84,18 @@ describe('requireAuth', () => {
 });
 
 describe('optionalAuth', () => {
-  const originalConsoleWarn = console.warn;
+  const originalLoggerWarn = logger.warn;
   let warnings: unknown[][];
 
   beforeEach(() => {
     warnings = [];
-    console.warn = (...args: unknown[]) => {
+    logger.warn = (...args: unknown[]) => {
       warnings.push(args);
     };
   });
 
   afterEach(() => {
-    console.warn = originalConsoleWarn;
+    logger.warn = originalLoggerWarn;
   });
 
   it('attaches the auth context when the lookup finds a session', async () => {
