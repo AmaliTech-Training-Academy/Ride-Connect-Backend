@@ -37,6 +37,9 @@ const authErrorMap: Record<string, { status: number; message: string }> = {
 
 const isBodyParserError = (err: unknown): boolean => err instanceof SyntaxError && 'body' in err;
 
+const isUniqueViolation = (err: unknown): boolean =>
+  typeof err === 'object' && err !== null && 'code' in err && err.code === '23505';
+
 const toCustomError = (err: unknown): CustomError | undefined => {
   if (err instanceof CustomError) {
     return err;
@@ -59,6 +62,10 @@ const toCustomError = (err: unknown): CustomError | undefined => {
 
   if (isBodyParserError(err)) {
     return CustomError.badRequest('Malformed JSON body');
+  }
+
+  if (isUniqueViolation(err)) {
+    return CustomError.conflict();
   }
 
   return undefined;

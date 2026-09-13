@@ -9,3 +9,6 @@ export const pool = new Pool({ connectionString: env.DATABASE_URL });
 export const db = drizzle(pool, { schema });
 
 export { schema };
+
+/** Anything a service can run a query on — the pool or an open transaction. */
+export type Executor = typeof db | Parameters<Parameters<typeof db.transaction>[0]>[0];

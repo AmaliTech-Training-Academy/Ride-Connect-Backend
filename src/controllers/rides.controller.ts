@@ -1,23 +1,10 @@
-import { db } from '../db';
-import { rides } from '../db/schema';
 import { authedController } from '../lib/http/controller';
+import * as ridesService from '../services/rides.service';
 import type { CreateRideInput } from '../validators/rides.validator';
 
 /** POST /rides — publishes a Ride the authenticated User is driving. */
 export const createRide = authedController<{ body: CreateRideInput }>(async (req, res) => {
-  const { origin, destination, departureAt, availableSeats } = req.validated.body;
-
-  const [ride] = await db
-    .insert(rides)
-    .values({
-      driverId: req.auth.user.id,
-      origin,
-      destination,
-      departureAt,
-      totalSeats: availableSeats,
-      availableSeats,
-    })
-    .returning();
+  const ride = await ridesService.createRide(req.auth.user.id, req.validated.body);
 
   res.customSuccess({
     status: 201,
