@@ -1,6 +1,7 @@
 import express, { type Express, type RequestHandler } from 'express';
 import request from 'supertest';
 
+import { logger } from '../lib/logger';
 import { errorHandler } from './errorHandler.middleware';
 import { responseMiddleware } from './response.middleware';
 
@@ -24,14 +25,14 @@ function buildApp(handler: RequestHandler): Express {
 }
 
 describe('errorHandler', () => {
-  const originalConsoleError = console.error;
+  const originalLoggerError = logger.error;
 
   beforeEach(() => {
-    console.error = () => undefined;
+    logger.error = () => undefined;
   });
 
   afterEach(() => {
-    console.error = originalConsoleError;
+    logger.error = originalLoggerError;
   });
 
   it('returns a consistent JSON 500 response for a synchronously thrown error, without leaking the stack trace', async () => {
