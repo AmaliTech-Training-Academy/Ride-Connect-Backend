@@ -8,17 +8,18 @@ const MIN_SEATS = 1;
 const MAX_SEATS = 8;
 
 interface RideFieldErrors {
-  origin?: string;
-  destination?: string;
-  departureDate?: string;
-  departureTime?: string;
-  availableSeats?: string;
+  origin?: string[];
+  destination?: string[];
+  departureDate?: string[];
+  departureTime?: string[];
+  availableSeats?: string[];
 }
 
 function isNonEmptyString(value: unknown): value is string {
   return typeof value === 'string' && value.trim().length > 0;
 }
 
+/** POST /rides — publishes a Ride the authenticated User is driving. */
 export const createRide: RequestHandler = async (req, res, next) => {
   try {
     const { origin, destination, departureDate, departureTime, availableSeats } = req.body ?? {};
@@ -26,11 +27,11 @@ export const createRide: RequestHandler = async (req, res, next) => {
     const errors: RideFieldErrors = {};
 
     if (!isNonEmptyString(origin)) {
-      errors.origin = RIDE_ERROR_MESSAGES.ORIGIN_REQUIRED;
+      errors.origin = [RIDE_ERROR_MESSAGES.ORIGIN_REQUIRED];
     }
 
     if (!isNonEmptyString(destination)) {
-      errors.destination = RIDE_ERROR_MESSAGES.DESTINATION_REQUIRED;
+      errors.destination = [RIDE_ERROR_MESSAGES.DESTINATION_REQUIRED];
     }
 
     if (
@@ -38,15 +39,15 @@ export const createRide: RequestHandler = async (req, res, next) => {
       isNonEmptyString(destination) &&
       origin.trim().toLowerCase() === destination.trim().toLowerCase()
     ) {
-      errors.destination = RIDE_ERROR_MESSAGES.DESTINATION_SAME_AS_ORIGIN;
+      errors.destination = [RIDE_ERROR_MESSAGES.DESTINATION_SAME_AS_ORIGIN];
     }
 
     if (!isNonEmptyString(departureDate)) {
-      errors.departureDate = RIDE_ERROR_MESSAGES.DEPARTURE_DATE_REQUIRED;
+      errors.departureDate = [RIDE_ERROR_MESSAGES.DEPARTURE_DATE_REQUIRED];
     }
 
     if (!isNonEmptyString(departureTime)) {
-      errors.departureTime = RIDE_ERROR_MESSAGES.DEPARTURE_TIME_REQUIRED;
+      errors.departureTime = [RIDE_ERROR_MESSAGES.DEPARTURE_TIME_REQUIRED];
     }
 
     let departureAt: Date | undefined;
@@ -57,25 +58,27 @@ export const createRide: RequestHandler = async (req, res, next) => {
       const candidate = new Date(`${departureDate}T${departureTime}`);
 
       if (Number.isNaN(candidate.getTime())) {
-        errors.departureDate = RIDE_ERROR_MESSAGES.DEPARTURE_DATETIME_INVALID;
+        errors.departureDate = [RIDE_ERROR_MESSAGES.DEPARTURE_DATETIME_INVALID];
       } else if (candidate.getTime() < Date.now()) {
-        errors.departureDate = RIDE_ERROR_MESSAGES.DEPARTURE_IN_PAST;
+        errors.departureDate = [RIDE_ERROR_MESSAGES.DEPARTURE_IN_PAST];
       } else {
         departureAt = candidate;
       }
     }
 
     if (availableSeats === undefined || availableSeats === null || availableSeats === '') {
-      errors.availableSeats = RIDE_ERROR_MESSAGES.AVAILABLE_SEATS_REQUIRED;
+      errors.availableSeats = [RIDE_ERROR_MESSAGES.AVAILABLE_SEATS_REQUIRED];
     } else {
       const seats = Number(availableSeats);
       if (!Number.isInteger(seats) || seats < MIN_SEATS || seats > MAX_SEATS) {
-        errors.availableSeats = RIDE_ERROR_MESSAGES.availableSeatsOutOfRange(MIN_SEATS, MAX_SEATS);
+        errors.availableSeats = [
+          RIDE_ERROR_MESSAGES.availableSeatsOutOfRange(MIN_SEATS, MAX_SEATS),
+        ];
       }
     }
 
     if (Object.keys(errors).length > 0) {
-      res.status(400).json({ error: { code: 'VALIDATION_ERROR', fields: errors } });
+      res.customInvalid({ data: { fields: errors } });
       return;
     }
 
@@ -93,7 +96,11 @@ export const createRide: RequestHandler = async (req, res, next) => {
       })
       .returning();
 
-    res.status(201).json({ ride });
+    res.customSuccess({
+      status: 201,
+      message: 'Ride created successfully',
+      data: ride,
+    });
   } catch (error) {
     next(error);
   }

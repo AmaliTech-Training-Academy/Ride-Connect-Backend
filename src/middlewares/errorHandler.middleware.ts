@@ -1,11 +1,7 @@
+import { isAPIError } from 'better-auth/api';
 import type { NextFunction, Request, Response } from 'express';
 
-import { sendJsonError } from '../utils/sendJsonError';
-
-interface AuthApiError extends Error {
-  statusCode: number;
-  body?: { code?: string; message?: string };
-}
+import { CustomError, sendCustomError } from '../lib/http/errors';
 
 const authErrorMap: Record<string, { status: number; message: string }> = {
   USER_ALREADY_EXISTS: {
@@ -38,9 +34,32 @@ const authErrorMap: Record<string, { status: number; message: string }> = {
   },
 };
 
-const isAuthApiError = (err: unknown): err is AuthApiError =>
-  err instanceof Error && typeof (err as Partial<AuthApiError>).statusCode === 'number';
+const isBodyParserError = (err: unknown): boolean => err instanceof SyntaxError && 'body' in err;
 
+const toCustomError = (err: unknown): CustomError | undefined => {
+  if (err instanceof CustomError) {
+    return err;
+  }
+
+  if (isAPIError(err)) {
+    const code = err.body?.code;
+    const mapped = code ? authErrorMap[code] : undefined;
+    const status = mapped?.status ?? err.statusCode;
+    const message = mapped?.message ?? err.body?.message ?? 'Authentication request failed.';
+    // Codes differ between a wrong password and an unknown email; a 401 must not.
+    const details = code && status !== 401 ? { code } : undefined;
+
+    return new CustomError(status, message, details);
+  }
+
+  if (isBodyParserError(err)) {
+    return CustomError.badRequest('Malformed JSON body');
+  }
+
+  return undefined;
+};
+
+/** Renders every unhandled error through the response envelope. */
 export const errorHandler = (
   err: unknown,
   _req: Request,
@@ -52,20 +71,14 @@ export const errorHandler = (
     return;
   }
 
-  if (isAuthApiError(err)) {
-    const code = err.body?.code;
-    const mapped = code ? authErrorMap[code] : undefined;
+  const known = toCustomError(err);
 
-    res.status(mapped?.status ?? err.statusCode).json({
-      error: {
-        code: code ?? 'AUTH_ERROR',
-        message: mapped?.message ?? err.body?.message ?? 'Authentication request failed.',
-      },
-    });
+  if (known) {
+    sendCustomError(res, known);
     return;
   }
 
   console.error(err);
 
-  sendJsonError(res, 500, 'Internal Server Error');
+  res.customFailure();
 };
