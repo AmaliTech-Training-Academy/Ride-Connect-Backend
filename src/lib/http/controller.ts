@@ -5,30 +5,34 @@ import type { AppRequest, AuthedRequest, ValidatedShape } from './types';
 
 type Handler<R> = (req: R, res: Response, next: NextFunction) => Promise<void> | void;
 
-const wrap =
-  <R>(fn: Handler<R>, requiresAuthContext: boolean): RequestHandler =>
+/** Wraps a public controller. Pair with `optionalAuth` when it needs to know the caller. */
+export const controller =
+  <V extends ValidatedShape = ValidatedShape>(fn: Handler<AppRequest<V>>): RequestHandler =>
   async (req, res, next) => {
+    req.validated ??= {};
+
     try {
-      if (requiresAuthContext && !req.auth) {
-        // The route is missing requireAuth. Fail closed rather than read through a
-        // req.auth the type system has already promised is there.
-        throw CustomError.unauthorized();
-      }
-
-      req.validated ??= {};
-
-      await fn(req as unknown as R, res, next);
+      await fn(req as unknown as AppRequest<V>, res, next);
     } catch (error) {
       next(error);
     }
   };
 
-/** Wraps a public controller. Pair with `optionalAuth` when it needs to know the caller. */
-export const controller = <V extends ValidatedShape = ValidatedShape>(
-  fn: Handler<AppRequest<V>>,
-): RequestHandler => wrap<AppRequest<V>>(fn, false);
-
 /** Wraps a protected controller. Pair with `requireAuth`, which this re-checks at runtime. */
-export const authedController = <V extends ValidatedShape = ValidatedShape>(
-  fn: Handler<AuthedRequest<V>>,
-): RequestHandler => wrap<AuthedRequest<V>>(fn, true);
+export const authedController =
+  <V extends ValidatedShape = ValidatedShape>(fn: Handler<AuthedRequest<V>>): RequestHandler =>
+  async (req, res, next) => {
+    if (!req.auth) {
+      // The route is missing requireAuth; fail closed rather than trust the type.
+      next(CustomError.unauthorized());
+      return;
+    }
+
+    req.validated ??= {};
+
+    try {
+      await fn(req as unknown as AuthedRequest<V>, res, next);
+    } catch (error) {
+      next(error);
+    }
+  };
