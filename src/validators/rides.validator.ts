@@ -51,3 +51,14 @@ export const createRideSchema = z
   }));
 
 export type CreateRideInput = z.infer<typeof createRideSchema>;
+
+export const listRidesSchema = z.object({
+  date: z.iso.date({ error: 'Invalid date. Use YYYY-MM-DD.' }).optional(),
+  search: z
+    .string()
+    .trim()
+    .optional()
+    .transform((value) => (value ? value : undefined)),
+});
+
+export type ListRidesQuery = z.infer<typeof listRidesSchema>;

@@ -1,6 +1,6 @@
-import { authedController } from '../lib/http/controller';
+import { authedController, controller } from '../lib/http/controller';
 import * as ridesService from '../services/rides.service';
-import type { CreateRideInput } from '../validators/rides.validator';
+import type { CreateRideInput, ListRidesQuery } from '../validators/rides.validator';
 
 /** POST /api/rides — publishes a Ride the authenticated User is driving. */
 export const createRide = authedController<{ body: CreateRideInput }>(async (req, res) => {
@@ -11,4 +11,11 @@ export const createRide = authedController<{ body: CreateRideInput }>(async (req
     message: 'Ride created successfully',
     data: ride,
   });
+});
+
+/** GET /api/rides — browses open Rides, optionally filtered by day or route keyword. */
+export const listRides = controller<{ query: ListRidesQuery }>(async (req, res) => {
+  const rides = await ridesService.listRides(req.validated.query);
+
+  res.customSuccess({ data: rides });
 });
