@@ -7,5 +7,5 @@ import { createRideSchema, listRidesSchema } from '../validators/rides.validator
 
 export const ridesRouter = Router();
 
-ridesRouter.get('/', validate({ query: listRidesSchema }), listRides);
+ridesRouter.get('/', requireAuth, validate({ query: listRidesSchema }), listRides);
 ridesRouter.post('/', requireAuth, validate({ body: createRideSchema }), createRide);
