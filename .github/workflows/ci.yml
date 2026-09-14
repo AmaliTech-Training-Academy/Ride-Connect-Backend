@@ -6,6 +6,7 @@ on:
       - main
       - develop
       - testing
+  workflow_call:
 
 jobs:
   conventions:
@@ -82,3 +83,8 @@ jobs:
 
       - name: Test
         run: npm test
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: build-output
+          path: dist/
