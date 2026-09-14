@@ -1,6 +1,6 @@
 import { authedController } from '../lib/http/controller';
 import * as ridesService from '../services/rides.service';
-import type { CreateRideInput } from '../validators/rides.validator';
+import type { CreateRideInput, ListRidesQuery } from '../validators/rides.validator';
 
 /** POST /api/rides — publishes a Ride the authenticated User is driving. */
 export const createRide = authedController<{ body: CreateRideInput }>(async (req, res) => {
@@ -10,5 +10,27 @@ export const createRide = authedController<{ body: CreateRideInput }>(async (req
     status: 201,
     message: 'Ride created successfully',
     data: ride,
+  });
+});
+
+function noRidesMessage(filters: ListRidesQuery): string {
+  if (filters.date) {
+    return 'No rides found for this date.';
+  }
+
+  if (filters.search) {
+    return 'No rides found for this route.';
+  }
+
+  return 'No rides found.';
+}
+
+/** GET /api/rides — browses open Rides, optionally filtered by day or route keyword. Requires authentication. */
+export const listRides = authedController<{ query: ListRidesQuery }>(async (req, res) => {
+  const rides = await ridesService.listRides(req.validated.query);
+
+  res.customSuccess({
+    message: rides.length === 0 ? noRidesMessage(req.validated.query) : 'Rides fetched successfully',
+    data: rides,
   });
 });
