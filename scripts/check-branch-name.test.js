@@ -31,7 +31,6 @@ describe('isAllowedBranchName', () => {
     'feat/RID-1-authentication-and-db-setup',
     'feat/us1',
     'feat/us8-out-of-range',
-    'feat/t11-out-of-range',
     'feat/US1-Register-Email',
     'feature/us1-register-work-email',
     'fix/Expired-JWT',

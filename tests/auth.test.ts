@@ -11,7 +11,7 @@ const VALID_PASSWORD = 'careful-horse-8';
 
 async function registerUser(email: string, password = VALID_PASSWORD) {
   const response = await request(app)
-    .post('/register')
+    .post('/api/register')
     .send({ name: 'Grace Hopper', email, password });
 
   expect(response.status).toBe(201);
@@ -31,15 +31,15 @@ describe('POST /register', () => {
     const email = uniqueEmail('ac1');
 
     const response = await request(app)
-      .post('/register')
+      .post('/api/register')
       .send({ name: 'Grace Hopper', email, password: VALID_PASSWORD });
 
     expect(response.status).toBe(201);
-    expect(response.body.user).toMatchObject({
+    expect(response.body.data.user).toMatchObject({
       name: 'Grace Hopper',
       email,
     });
-    expect(response.body.user.id).toMatch(
+    expect(response.body.data.user.id).toMatch(
       /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
     );
     expect(JSON.stringify(response.body)).not.toContain(VALID_PASSWORD);
@@ -47,11 +47,12 @@ describe('POST /register', () => {
 
   it('AC1: rejects a password shorter than 8 characters', async () => {
     const response = await request(app)
-      .post('/register')
+      .post('/api/register')
       .send({ name: 'Grace Hopper', email: uniqueEmail('ac1-short'), password: 'abc1234' });
 
     expect(response.status).toBe(400);
-    expect(response.body.error.code).toBe('PASSWORD_TOO_SHORT');
+    expect(response.body.success).toBe(false);
+    expect(response.body.data.fields.password[0]).toMatch(/at least 8 characters/);
   });
 
   it('AC2: returns 409 with a distinct error when the email is already used', async () => {
@@ -59,14 +60,15 @@ describe('POST /register', () => {
     await registerUser(email);
 
     const response = await request(app)
-      .post('/register')
+      .post('/api/register')
       .send({ name: 'Grace Hopper', email, password: VALID_PASSWORD });
 
     expect(response.status).toBe(409);
-    expect(response.body.error.code).toBe('USER_ALREADY_EXISTS_USE_ANOTHER_EMAIL');
-    expect(response.body.error.message).toMatch(/already exists/i);
+    expect(response.body.success).toBe(false);
+    expect(response.body.data.code).toBe('USER_ALREADY_EXISTS_USE_ANOTHER_EMAIL');
+    expect(response.body.message).toMatch(/already exists/i);
 
-    expect(response.body.error.message).not.toBe('Invalid email or password');
+    expect(response.body.message).not.toBe('Invalid email or password');
   });
 
   it('AC2: does not create a second user row for a duplicate email', async () => {
@@ -74,14 +76,14 @@ describe('POST /register', () => {
     const first = await registerUser(email);
 
     await request(app)
-      .post('/register')
+      .post('/api/register')
       .send({ name: 'Impostor', email, password: 'another-password-9' });
 
-    const login = await request(app).post('/login').send({ email, password: VALID_PASSWORD });
+    const login = await request(app).post('/api/login').send({ email, password: VALID_PASSWORD });
 
     expect(login.status).toBe(200);
-    expect(login.body.user.id).toBe(first.body.user.id);
-    expect(login.body.user.name).toBe('Grace Hopper');
+    expect(login.body.data.user.id).toBe(first.body.data.user.id);
+    expect(login.body.data.user.name).toBe('Grace Hopper');
   });
 });
 
@@ -90,13 +92,13 @@ describe('POST /login', () => {
     const email = uniqueEmail('ac3');
     await registerUser(email);
 
-    const response = await request(app).post('/login').send({ email, password: VALID_PASSWORD });
+    const response = await request(app).post('/api/login').send({ email, password: VALID_PASSWORD });
 
     expect(response.status).toBe(200);
-    expect(response.body.user).toMatchObject({ email });
-    expect(typeof response.body.token).toBe('string');
-    expect(response.body.token.length).toBeGreaterThan(0);
-    expect(response.body.redirectTo).toBe(POST_LOGIN_REDIRECT);
+    expect(response.body.data.user).toMatchObject({ email });
+    expect(typeof response.body.data.token).toBe('string');
+    expect(response.body.data.token.length).toBeGreaterThan(0);
+    expect(response.body.data.redirectTo).toBe(POST_LOGIN_REDIRECT);
 
     const setCookie = response.headers['set-cookie'];
     expect(setCookie).toBeDefined();
@@ -107,7 +109,7 @@ describe('POST /login', () => {
     const email = uniqueEmail('ac3-noredirect');
     await registerUser(email);
 
-    const response = await request(app).post('/login').send({ email, password: VALID_PASSWORD });
+    const response = await request(app).post('/api/login').send({ email, password: VALID_PASSWORD });
 
     expect(response.status).toBe(200);
     expect(response.status).toBeLessThan(300);
@@ -119,20 +121,22 @@ describe('POST /login', () => {
     await registerUser(email);
 
     const response = await request(app)
-      .post('/login')
+      .post('/api/login')
       .send({ email, password: 'definitely-not-it' });
 
     expect(response.status).toBe(401);
-    expect(response.body.error.message).toBe('Invalid email or password');
+    expect(response.body.message).toBe('Invalid email or password');
+    expect(response.body.data).toBeUndefined();
   });
 
   it('AC4: returns the generic message for an unknown email', async () => {
     const response = await request(app)
-      .post('/login')
+      .post('/api/login')
       .send({ email: uniqueEmail('ac4-unknown'), password: VALID_PASSWORD });
 
     expect(response.status).toBe(401);
-    expect(response.body.error.message).toBe('Invalid email or password');
+    expect(response.body.message).toBe('Invalid email or password');
+    expect(response.body.data).toBeUndefined();
   });
 
   it('AC4: wrong password and unknown email are indistinguishable', async () => {
@@ -140,11 +144,11 @@ describe('POST /login', () => {
     await registerUser(email);
 
     const wrongPassword = await request(app)
-      .post('/login')
+      .post('/api/login')
       .send({ email, password: 'definitely-not-it' });
 
     const unknownEmail = await request(app)
-      .post('/login')
+      .post('/api/login')
       .send({ email: uniqueEmail('ac4-missing'), password: VALID_PASSWORD });
 
     expect(wrongPassword.status).toBe(unknownEmail.status);

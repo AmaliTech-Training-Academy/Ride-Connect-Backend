@@ -11,7 +11,7 @@ const VALID_PASSWORD = 'careful-horse-8';
 /** Registers a new driver and returns their session cookie (better-auth auto-signs-in on register). */
 async function registerDriver(): Promise<string> {
   const response = await request(app)
-    .post('/register')
+    .post('/api/register')
     .send({ name: 'Grace Hopper', email: uniqueEmail('driver'), password: VALID_PASSWORD });
 
   const cookie = response.headers['set-cookie'];
@@ -49,36 +49,42 @@ describe('POST /rides', () => {
   it('creates a ride with status OPEN when all fields are valid', async () => {
     const cookie = await registerDriver();
 
-    const response = await request(app).post('/rides').set('Cookie', cookie).send(validRide());
+    const response = await request(app).post('/api/rides').set('Cookie', cookie).send(validRide());
 
     expect(response.status).toBe(201);
-    expect(response.body.ride).toMatchObject({
+    expect(response.body.success).toBe(true);
+    expect(response.body.data).toMatchObject({
       origin: 'Accra',
       destination: 'Kumasi',
       totalSeats: 3,
       availableSeats: 3,
       status: 'OPEN',
     });
+    expect(response.body.data).not.toHaveProperty('updatedAt');
   });
 
   it('rejects an unauthenticated request', async () => {
-    const response = await request(app).post('/rides').send(validRide());
+    const response = await request(app).post('/api/rides').send(validRide());
 
     expect(response.status).toBe(401);
+    expect(response.body).toEqual({
+      success: false,
+      message: 'Authentication required. Please log in.',
+    });
   });
 
   it('rejects a submission missing all required fields', async () => {
     const cookie = await registerDriver();
 
-    const response = await request(app).post('/rides').set('Cookie', cookie).send({});
+    const response = await request(app).post('/api/rides').set('Cookie', cookie).send({});
 
     expect(response.status).toBe(400);
-    expect(response.body.error.fields).toMatchObject({
-      origin: expect.any(String),
-      destination: expect.any(String),
-      departureDate: expect.any(String),
-      departureTime: expect.any(String),
-      availableSeats: expect.any(String),
+    expect(response.body.data.fields).toMatchObject({
+      origin: [expect.any(String)],
+      destination: [expect.any(String)],
+      departureDate: [expect.any(String)],
+      departureTime: [expect.any(String)],
+      availableSeats: [expect.any(String)],
     });
   });
 
@@ -86,12 +92,12 @@ describe('POST /rides', () => {
     const cookie = await registerDriver();
 
     const response = await request(app)
-      .post('/rides')
+      .post('/api/rides')
       .set('Cookie', cookie)
       .send({ ...validRide(), availableSeats: 9 });
 
     expect(response.status).toBe(400);
-    expect(response.body.error.fields.availableSeats).toMatch(/between 1 and 8/);
+    expect(response.body.data.fields.availableSeats[0]).toMatch(/between 1 and 8/);
   });
 
   it('rejects a departure date in the past', async () => {
@@ -99,23 +105,23 @@ describe('POST /rides', () => {
     const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
 
     const response = await request(app)
-      .post('/rides')
+      .post('/api/rides')
       .set('Cookie', cookie)
       .send({ ...validRide(), departureDate: yesterday });
 
     expect(response.status).toBe(400);
-    expect(response.body.error.fields.departureDate).toMatch(/past/);
+    expect(response.body.data.fields.departureDate[0]).toMatch(/past/);
   });
 
   it('rejects when origin and destination are the same', async () => {
     const cookie = await registerDriver();
 
     const response = await request(app)
-      .post('/rides')
+      .post('/api/rides')
       .set('Cookie', cookie)
       .send({ ...validRide(), destination: 'accra' });
 
     expect(response.status).toBe(400);
-    expect(response.body.error.fields.destination).toBeDefined();
+    expect(response.body.data.fields.destination).toBeDefined();
   });
 });

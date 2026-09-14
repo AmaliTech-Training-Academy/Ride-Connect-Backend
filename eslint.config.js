@@ -34,4 +34,16 @@ module.exports = tseslint.config(
       '@typescript-eslint/no-require-imports': 'off',
     },
   },
+  {
+    files: ['src/**/*.ts'],
+    rules: {
+      'no-console': 'error',
+    },
+  },
+  {
+    files: ['src/config/env.ts', 'src/lib/logger.ts'],
+    rules: {
+      'no-console': 'off',
+    },
+  },
 );
