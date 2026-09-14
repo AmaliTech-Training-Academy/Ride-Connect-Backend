@@ -1,4 +1,4 @@
-import { authedController, controller } from '../lib/http/controller';
+import { authedController } from '../lib/http/controller';
 import * as ridesService from '../services/rides.service';
 import type { CreateRideInput, ListRidesQuery } from '../validators/rides.validator';
 
@@ -25,8 +25,8 @@ function noRidesMessage(filters: ListRidesQuery): string {
   return 'No rides found.';
 }
 
-/** GET /api/rides — browses open Rides, optionally filtered by day or route keyword. */
-export const listRides = controller<{ query: ListRidesQuery }>(async (req, res) => {
+/** GET /api/rides — browses open Rides, optionally filtered by day or route keyword. Requires authentication. */
+export const listRides = authedController<{ query: ListRidesQuery }>(async (req, res) => {
   const rides = await ridesService.listRides(req.validated.query);
 
   res.customSuccess({

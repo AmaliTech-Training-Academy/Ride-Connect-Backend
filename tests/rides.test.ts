@@ -146,12 +146,23 @@ describe('POST /rides', () => {
 });
 
 describe('GET /rides', () => {
-  it('lists open rides by default, without requiring auth', async () => {
+  it('rejects an unauthenticated request', async () => {
+    const response = await request(app).get('/api/rides');
+
+    expect(response.status).toBe(401);
+    expect(response.body).toEqual({
+      success: false,
+      message: 'Authentication required. Please log in.',
+    });
+  });
+
+  it('lists open rides for an authenticated colleague', async () => {
     await postRide({ origin: 'Accra', destination: 'Kumasi' });
     const cancelled = await postRide({ origin: 'Tema', destination: 'Ho' });
     await db.update(rides).set({ status: 'CANCELLED' }).where(eq(rides.id, cancelled.id));
 
-    const response = await request(app).get('/api/rides');
+    const cookie = await registerDriver();
+    const response = await request(app).get('/api/rides').set('Cookie', cookie);
 
     expect(response.status).toBe(200);
     expect(response.body.data).toHaveLength(1);
@@ -165,7 +176,8 @@ describe('GET /rides', () => {
     await postRide({ origin: 'Accra', destination: 'Kumasi', departureDate: day1.date, departureTime: day1.time });
     await postRide({ origin: 'Tema', destination: 'Ho', departureDate: day2.date, departureTime: day2.time });
 
-    const response = await request(app).get('/api/rides').query({ date: day1.date });
+    const cookie = await registerDriver();
+    const response = await request(app).get('/api/rides').set('Cookie', cookie).query({ date: day1.date });
 
     expect(response.status).toBe(200);
     expect(response.body.data).toHaveLength(1);
@@ -177,7 +189,8 @@ describe('GET /rides', () => {
     await postRide({ origin: 'Takoradi', destination: 'Accra' });
     await postRide({ origin: 'Tema', destination: 'Ho' });
 
-    const response = await request(app).get('/api/rides').query({ search: 'ACCRA' });
+    const cookie = await registerDriver();
+    const response = await request(app).get('/api/rides').set('Cookie', cookie).query({ search: 'ACCRA' });
 
     expect(response.status).toBe(200);
     expect(response.body.data).toHaveLength(2);
@@ -187,7 +200,8 @@ describe('GET /rides', () => {
     await postRide();
 
     const farOut = daysFromNow(30);
-    const response = await request(app).get('/api/rides').query({ date: farOut.date });
+    const cookie = await registerDriver();
+    const response = await request(app).get('/api/rides').set('Cookie', cookie).query({ date: farOut.date });
 
     expect(response.status).toBe(200);
     expect(response.body.data).toEqual([]);
@@ -197,7 +211,8 @@ describe('GET /rides', () => {
   it('returns a friendly message when nothing matches the search filter', async () => {
     await postRide({ origin: 'Accra', destination: 'Kumasi' });
 
-    const response = await request(app).get('/api/rides').query({ search: 'Tamale' });
+    const cookie = await registerDriver();
+    const response = await request(app).get('/api/rides').set('Cookie', cookie).query({ search: 'Tamale' });
 
     expect(response.status).toBe(200);
     expect(response.body.data).toEqual([]);
@@ -205,7 +220,8 @@ describe('GET /rides', () => {
   });
 
   it('rejects an invalid date format', async () => {
-    const response = await request(app).get('/api/rides').query({ date: 'not-a-date' });
+    const cookie = await registerDriver();
+    const response = await request(app).get('/api/rides').set('Cookie', cookie).query({ date: 'not-a-date' });
 
     expect(response.status).toBe(400);
     expect(response.body.data.fields.date[0]).toMatch(/invalid date/i);
