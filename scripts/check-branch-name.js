@@ -7,8 +7,8 @@ const LONG_LIVED_BRANCHES = new Set(['main', 'develop', 'testing']);
 /** Created before branch naming was enforced. Do not add new names here. */
 const GRANDFATHERED_BRANCHES = new Set(['chore/initial-boilerplate-setup']);
 
-/** `feat/<us-id>-short-desc` — us-id is US1–US7 or T1–T10. */
-const FEATURE_BRANCH = /^feat\/(?:us[1-7]|t(?:[1-9]|10))-[a-z0-9]+(?:-[a-z0-9]+)*$/;
+/** `feat/<us-id>-short-desc` — us-id is US1–US7 or T1–T90. (Should've made it rid like on Jira, but anywayssss) */
+const FEATURE_BRANCH = /^feat\/(?:us[1-7]|t(?:[1-9]\d*|90))-[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
 /** Hotfix branches: `fix/<short-desc>` off main (prod). */
 const HOTFIX_BRANCH = /^fix\/[a-z0-9]+(?:-[a-z0-9]+)*$/;

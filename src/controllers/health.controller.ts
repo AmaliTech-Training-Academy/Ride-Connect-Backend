@@ -1,9 +1,12 @@
-import type { Request, Response } from 'express';
+import { controller } from '../lib/http/controller';
 
-export const getHealth = (_req: Request, res: Response): void => {
-  res.status(200).json({
-    status: 'ok',
-    uptime: process.uptime(),
-    timestamp: new Date().toISOString(),
+/** GET /api/health — reports that the process is up. Touches no dependency. */
+export const getHealth = controller((_req, res) => {
+  res.customSuccess({
+    message: 'Service is healthy',
+    data: {
+      uptime: process.uptime(),
+      timestamp: new Date().toISOString(),
+    },
   });
-};
+});
