@@ -1,7 +1,9 @@
 import type { Request, Response } from 'express';
 
-import { sendJsonError } from '../utils/sendJsonError';
-
+/** Answers any request that matched no route. */
 export const notFoundHandler = (req: Request, res: Response): void => {
-  sendJsonError(res, 404, `Route not found: ${req.method} ${req.originalUrl}`);
+  res.customInvalid({
+    status: 404,
+    message: `Not Found - ${req.method} ${req.originalUrl}`,
+  });
 };
