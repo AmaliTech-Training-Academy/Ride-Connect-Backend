@@ -13,9 +13,24 @@ export const createRide = authedController<{ body: CreateRideInput }>(async (req
   });
 });
 
+function noRidesMessage(filters: ListRidesQuery): string {
+  if (filters.date) {
+    return 'No rides found for this date.';
+  }
+
+  if (filters.search) {
+    return 'No rides found for this route.';
+  }
+
+  return 'No rides found.';
+}
+
 /** GET /api/rides — browses open Rides, optionally filtered by day or route keyword. */
 export const listRides = controller<{ query: ListRidesQuery }>(async (req, res) => {
   const rides = await ridesService.listRides(req.validated.query);
 
-  res.customSuccess({ data: rides });
+  res.customSuccess({
+    message: rides.length === 0 ? noRidesMessage(req.validated.query) : 'Rides fetched successfully',
+    data: rides,
+  });
 });

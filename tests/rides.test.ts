@@ -183,7 +183,7 @@ describe('GET /rides', () => {
     expect(response.body.data).toHaveLength(2);
   });
 
-  it('returns an empty list when nothing matches the date filter', async () => {
+  it('returns a friendly message when nothing matches the date filter', async () => {
     await postRide();
 
     const farOut = daysFromNow(30);
@@ -191,6 +191,17 @@ describe('GET /rides', () => {
 
     expect(response.status).toBe(200);
     expect(response.body.data).toEqual([]);
+    expect(response.body.message).toBe('No rides found for this date.');
+  });
+
+  it('returns a friendly message when nothing matches the search filter', async () => {
+    await postRide({ origin: 'Accra', destination: 'Kumasi' });
+
+    const response = await request(app).get('/api/rides').query({ search: 'Tamale' });
+
+    expect(response.status).toBe(200);
+    expect(response.body.data).toEqual([]);
+    expect(response.body.message).toBe('No rides found for this route.');
   });
 
   it('rejects an invalid date format', async () => {
