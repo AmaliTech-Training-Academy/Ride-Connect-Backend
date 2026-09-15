@@ -78,8 +78,30 @@ describe('POST /rides', () => {
       totalSeats: 3,
       availableSeats: 3,
       status: 'OPEN',
+      driverName: 'Grace Hopper',
     });
     expect(response.body.data).not.toHaveProperty('updatedAt');
+  });
+
+  it('saves the route description when one is given, and returns it', async () => {
+    const cookie = await registerDriver();
+
+    const response = await request(app)
+      .post('/api/rides')
+      .set('Cookie', cookie)
+      .send({ ...validRide(), routeDescription: 'Meet at the Shell station, silver Corolla' });
+
+    expect(response.status).toBe(201);
+    expect(response.body.data.routeDescription).toBe('Meet at the Shell station, silver Corolla');
+  });
+
+  it('leaves the route description out when none is given', async () => {
+    const cookie = await registerDriver();
+
+    const response = await request(app).post('/api/rides').set('Cookie', cookie).send(validRide());
+
+    expect(response.status).toBe(201);
+    expect(response.body.data.routeDescription).toBeNull();
   });
 
   it('rejects an unauthenticated request', async () => {
@@ -166,7 +188,17 @@ describe('GET /rides', () => {
 
     expect(response.status).toBe(200);
     expect(response.body.data).toHaveLength(1);
-    expect(response.body.data[0]).toMatchObject({ origin: 'Accra', status: 'OPEN' });
+    expect(response.body.data[0]).toMatchObject({ origin: 'Accra', status: 'OPEN', driverName: 'Grace Hopper' });
+  });
+
+  it('includes the route description when the driver gave one', async () => {
+    await postRide({ routeDescription: 'Meet at the Shell station, silver Corolla' });
+
+    const cookie = await registerDriver();
+    const response = await request(app).get('/api/rides').set('Cookie', cookie);
+
+    expect(response.status).toBe(200);
+    expect(response.body.data[0].routeDescription).toBe('Meet at the Shell station, silver Corolla');
   });
 
   it('filters by departure date, returning only rides on that date', async () => {
