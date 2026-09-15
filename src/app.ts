@@ -18,7 +18,7 @@ export const createApp = (): Express => {
   app.disable('x-powered-by');
   app.use(responseMiddleware);
   app.use(helmet());
-  app.use(cors({ origin: env.TRUSTED_ORIGINS, credentials: true }));
+  app.use(cors({ origin: true, credentials: true }));
   app.use(
     morgan(env.NODE_ENV === 'production' ? 'combined' : 'dev', {
       stream: logger.stream,
