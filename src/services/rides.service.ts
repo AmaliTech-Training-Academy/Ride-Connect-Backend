@@ -1,7 +1,7 @@
 import { and, asc, eq, gte, ilike, lt, or } from 'drizzle-orm';
 
 import { db, type Executor } from '../db';
-import { rides } from '../db/schema';
+import { rides, users } from '../db/schema';
 import type { CreateRideInput, ListRidesQuery } from '../validators/rides.validator';
 
 /** Publishes a Ride on behalf of its Driver, with every offered seat still free. */
@@ -12,6 +12,7 @@ export async function createRide(driverId: string, input: CreateRideInput, exec:
       driverId,
       origin: input.origin,
       destination: input.destination,
+      routeDescription: input.routeDescription,
       departureAt: input.departureAt,
       totalSeats: input.seatsOffered,
       availableSeats: input.seatsOffered,
@@ -21,6 +22,7 @@ export async function createRide(driverId: string, input: CreateRideInput, exec:
       driverId: rides.driverId,
       origin: rides.origin,
       destination: rides.destination,
+      routeDescription: rides.routeDescription,
       departureAt: rides.departureAt,
       totalSeats: rides.totalSeats,
       availableSeats: rides.availableSeats,
@@ -52,8 +54,21 @@ export async function listRides(filters: ListRidesQuery, exec: Executor = db) {
   }
 
   return exec
-    .select()
+    .select({
+      id: rides.id,
+      driverId: rides.driverId,
+      driverName: users.name,
+      origin: rides.origin,
+      destination: rides.destination,
+      routeDescription: rides.routeDescription,
+      departureAt: rides.departureAt,
+      totalSeats: rides.totalSeats,
+      availableSeats: rides.availableSeats,
+      status: rides.status,
+      createdAt: rides.createdAt,
+    })
     .from(rides)
+    .innerJoin(users, eq(rides.driverId, users.id))
     .where(and(...conditions))
     .orderBy(asc(rides.departureAt));
 }

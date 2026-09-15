@@ -90,4 +90,23 @@ describe('createRideSchema', () => {
     expect(fieldErrors(validRide({ availableSeats: 9 })).availableSeats).toEqual(outOfRange);
     expect(fieldErrors(validRide({ availableSeats: 2.5 })).availableSeats).toEqual(outOfRange);
   });
+
+  it('is fine with no route description at all', () => {
+    const ride = createRideSchema.parse(validRide());
+
+    expect(ride.routeDescription).toBeUndefined();
+  });
+
+  it('trims the route description and drops a blank one', () => {
+    expect(createRideSchema.parse(validRide({ routeDescription: '  Meet by the main gate  ' })).routeDescription).toBe(
+      'Meet by the main gate',
+    );
+    expect(createRideSchema.parse(validRide({ routeDescription: '   ' })).routeDescription).toBeUndefined();
+  });
+
+  it('rejects a route description over 500 characters', () => {
+    expect(fieldErrors(validRide({ routeDescription: 'a'.repeat(501) })).routeDescription).toEqual([
+      'Route description must be 500 characters or fewer.',
+    ]);
+  });
 });
