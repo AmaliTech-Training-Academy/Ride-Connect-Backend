@@ -9,7 +9,7 @@ describe('GET /api/health', () => {
     expect(response.status).toBe(200);
     expect(response.body).toEqual({
       success: true,
-      message: 'Service is healthy',
+      message: 'Service is healthy for CI_CD pipeline',
       data: {
         uptime: expect.any(Number),
         timestamp: expect.any(String),
