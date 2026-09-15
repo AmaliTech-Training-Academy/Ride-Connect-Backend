@@ -26,3 +26,14 @@ describe('malformed request bodies', () => {
     expect(response.body).toEqual({ success: false, message: 'Malformed JSON body' });
   });
 });
+
+describe('CORS', () => {
+  it('allows requests from any origin', async () => {
+    const response = await request(app)
+      .get('/this-route-does-not-exist')
+      .set('Origin', 'https://frontend.example.com');
+
+    expect(response.headers['access-control-allow-origin']).toBe('https://frontend.example.com');
+    expect(response.headers['access-control-allow-credentials']).toBe('true');
+  });
+});
