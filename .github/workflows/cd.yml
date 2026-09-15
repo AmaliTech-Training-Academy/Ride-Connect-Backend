@@ -1,9 +1,10 @@
 name: CD
 
 on:
-  workflow_run:
-    workflows: [CI]
-    types: [completed]
+  push:
+    branches:
+      - develop
+      - feat/t21-cd # running a test here so I do not have to wait for ci approval.
 
 jobs:
   ci:
