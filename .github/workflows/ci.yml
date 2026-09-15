@@ -8,7 +8,7 @@ on:
       - testing
       - feat/t21-cd
 
-  workflow_call:
+  # workflow_call:
 
 jobs:
   conventions:
