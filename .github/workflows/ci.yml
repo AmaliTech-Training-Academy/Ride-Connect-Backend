@@ -8,10 +8,11 @@ on:
       - testing
       - feat/t21-cd
 
-  # workflow_call:
+  workflow_call:
 
 jobs:
   conventions:
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
 
     steps:
