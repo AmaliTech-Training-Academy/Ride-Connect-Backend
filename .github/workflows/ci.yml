@@ -1,5 +1,5 @@
 name: CI
-
+# just for testing purposes, will be removed later. (I want the pipleine to run...hehe)
 on:
   pull_request:
     branches:
