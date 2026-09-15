@@ -63,6 +63,7 @@ export const rides = pgTable(
       .references(() => users.id, { onDelete: 'cascade' }),
     origin: varchar('origin', { length: 255 }).notNull(),
     destination: varchar('destination', { length: 255 }).notNull(),
+    routeDescription: varchar('route_description', { length: 500 }),
     departureAt: timestamp('departure_at', { withTimezone: true }).notNull(),
     totalSeats: integer('total_seats').notNull(),
     availableSeats: integer('available_seats').notNull(),

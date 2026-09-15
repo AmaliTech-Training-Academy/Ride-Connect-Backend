@@ -14,6 +14,12 @@ export const createRideSchema = z
   .object({
     origin: z.string('Origin is required.').trim().min(1, 'Origin is required.'),
     destination: z.string('Destination is required.').trim().min(1, 'Destination is required.'),
+    routeDescription: z
+      .string()
+      .trim()
+      .max(500, 'Route description must be 500 characters or fewer.')
+      .optional()
+      .transform((value) => (value ? value : undefined)),
     departureDate: z.iso.date({
       error: requiredOr('Departure date is required.', 'Departure date or time is invalid.'),
     }),
@@ -46,6 +52,7 @@ export const createRideSchema = z
   .transform((ride) => ({
     origin: ride.origin,
     destination: ride.destination,
+    routeDescription: ride.routeDescription,
     seatsOffered: ride.availableSeats,
     departureAt: toDepartureInstant(ride.departureDate, ride.departureTime),
   }));
