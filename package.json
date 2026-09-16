@@ -19,6 +19,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
+    "db:migrate:deploy": "node dist/db/migrate.js",
     "db:migrate:test": "dotenv -e .env -- sh -c 'DATABASE_URL=\"$TEST_DATABASE_URL\" drizzle-kit migrate'",
     "db:studio": "drizzle-kit studio",
     "check:branch": "node scripts/check-branch-name.js",
