@@ -5,7 +5,7 @@ on:
     branches:
       - develop
       - feat/t21-cd # running a test here so I do not have to wait for ci approval.
-
+# test comment to retrigger the workflow
 jobs:
   ci:
     uses: ./.github/workflows/ci.yml   # runs lint/test/build, must pass first
