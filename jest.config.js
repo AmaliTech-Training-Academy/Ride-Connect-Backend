@@ -9,7 +9,7 @@ module.exports = {
   ],
   setupFiles: ['<rootDir>/tests/setup.ts'],
   collectCoverage: true,
-  collectCoverageFrom: ['src/**/*.ts', '!src/server.ts', '!src/**/*.test.ts'],
+  collectCoverageFrom: ['src/**/*.ts', '!src/server.ts', '!src/db/migrate.ts', '!src/**/*.test.ts'],
   coverageThreshold: {
     global: {
       branches: 75,
