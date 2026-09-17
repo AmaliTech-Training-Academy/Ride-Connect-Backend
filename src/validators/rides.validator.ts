@@ -69,3 +69,11 @@ export const listRidesSchema = z.object({
 });
 
 export type ListRidesQuery = z.infer<typeof listRidesSchema>;
+
+export const updateRideStatusSchema = z.object({
+  status: z.enum(['OPEN', 'FULL', 'CANCELLED'], {
+    error: 'Status must be one of OPEN, FULL, or CANCELLED.',
+  }),
+});
+
+export type UpdateRideStatusInput = z.infer<typeof updateRideStatusSchema>;
