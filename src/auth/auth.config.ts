@@ -52,6 +52,10 @@ export const auth = betterAuth({
       // must be UUIDs rather than better-auth's default random strings.
       generateId: 'uuid',
     },
+    defaultCookieAttributes: {
+      sameSite: 'none',
+      secure: true,
+    },
   },
 
   plugins: [],
