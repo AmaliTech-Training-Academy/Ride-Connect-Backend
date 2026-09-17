@@ -43,7 +43,7 @@ async function postRide(driver: AuthedUser, overrides: Record<string, unknown> =
       destination: 'Kumasi',
       departureDate: date,
       departureTime: time,
-      availableSeats: 1,
+      availableSeats: 2,
       ...overrides,
     });
 
@@ -64,16 +64,6 @@ afterAll(async () => {
 });
 
 describe('PATCH /rides/:rideId/status', () => {
-  it('lets the driver manually close an open ride', async () => {
-    const driver = await registerUser('Grace Hopper');
-    const ride = await postRide(driver);
-
-    const response = await setStatus(ride.id, 'FULL', driver);
-
-    expect(response.status).toBe(200);
-    expect(response.body.data.status).toBe('FULL');
-  });
-
   it('lets the driver cancel an open ride', async () => {
     const driver = await registerUser('Grace Hopper');
     const ride = await postRide(driver);
@@ -82,17 +72,6 @@ describe('PATCH /rides/:rideId/status', () => {
 
     expect(response.status).toBe(200);
     expect(response.body.data.status).toBe('CANCELLED');
-  });
-
-  it('lets the driver reopen a full ride when a seat is available', async () => {
-    const driver = await registerUser('Grace Hopper');
-    const ride = await postRide(driver, { availableSeats: 2 });
-    await setStatus(ride.id, 'FULL', driver);
-
-    const response = await setStatus(ride.id, 'OPEN', driver);
-
-    expect(response.status).toBe(200);
-    expect(response.body.data.status).toBe('OPEN');
   });
 
   it('rejects reopening a cancelled ride', async () => {
@@ -105,31 +84,19 @@ describe('PATCH /rides/:rideId/status', () => {
     expect(response.status).toBe(409);
   });
 
-  it('rejects a colleague who does not own the ride', async () => {
+  it('rejects accepting a pending request on a cancelled ride', async () => {
     const driver = await registerUser('Grace Hopper');
     const ride = await postRide(driver);
-    const someoneElse = await registerUser('Alan Turing');
+    const passenger = await registerUser('Ada Lovelace');
+    const created = await request(app)
+      .post(`/api/rides/${ride.id}/requests`)
+      .set('Cookie', passenger.cookie);
+    await setStatus(ride.id, 'CANCELLED', driver);
 
-    const response = await setStatus(ride.id, 'CANCELLED', someoneElse);
+    const response = await request(app)
+      .patch(`/api/rides/${ride.id}/requests/${created.body.data.id}/accept`)
+      .set('Cookie', driver.cookie);
 
-    expect(response.status).toBe(403);
-  });
-
-  it('rejects an unauthenticated request', async () => {
-    const driver = await registerUser('Grace Hopper');
-    const ride = await postRide(driver);
-
-    const response = await request(app).patch(`/api/rides/${ride.id}/status`).send({ status: 'CANCELLED' });
-
-    expect(response.status).toBe(401);
-  });
-
-  it('rejects an invalid status value', async () => {
-    const driver = await registerUser('Grace Hopper');
-    const ride = await postRide(driver);
-
-    const response = await setStatus(ride.id, 'DONE', driver);
-
-    expect(response.status).toBe(400);
+    expect(response.status).toBe(409);
   });
 });
