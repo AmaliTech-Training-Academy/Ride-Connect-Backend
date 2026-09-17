@@ -4,6 +4,17 @@ import { db, type Executor } from '../db';
 import { rideRequests, rides, users } from '../db/schema';
 import { CustomError } from '../lib/http/errors';
 
+const RIDE_NOT_FOUND = 'Ride not found.';
+const REQUEST_NOT_FOUND = 'Request not found.';
+const REQUEST_ALREADY_DECIDED = 'This request has already been decided.';
+const CANNOT_JOIN_OWN_RIDE = 'You cannot request to join your own ride.';
+const RIDE_NOT_OPEN = 'This ride is not open for requests.';
+const DUPLICATE_REQUEST = 'You have already requested to join this ride.';
+const NO_SEATS_REMAINING = 'No seats remain on this ride.';
+const NOT_RIDE_OWNER_VIEW = 'Only the driver who owns this ride can view its requests.';
+const NOT_RIDE_OWNER_ACCEPT = 'Only the driver who owns this ride can accept its requests.';
+const NOT_RIDE_OWNER_DECLINE = 'Only the driver who owns this ride can decline its requests.';
+
 /** Submits a passenger's request to join an open Ride. */
 export async function createRequest(rideId: string, passengerId: string, exec: Executor = db) {
   const [ride] = await exec
@@ -12,15 +23,15 @@ export async function createRequest(rideId: string, passengerId: string, exec: E
     .where(eq(rides.id, rideId));
 
   if (!ride) {
-    throw CustomError.notFound('Ride not found.');
+    throw CustomError.notFound(RIDE_NOT_FOUND);
   }
 
   if (ride.driverId === passengerId) {
-    throw CustomError.forbidden('You cannot request to join your own ride.');
+    throw CustomError.forbidden(CANNOT_JOIN_OWN_RIDE);
   }
 
   if (ride.status !== 'OPEN') {
-    throw CustomError.conflict('This ride is not open for requests.');
+    throw CustomError.conflict(RIDE_NOT_OPEN);
   }
 
   const [existing] = await exec
@@ -29,7 +40,7 @@ export async function createRequest(rideId: string, passengerId: string, exec: E
     .where(and(eq(rideRequests.rideId, rideId), eq(rideRequests.passengerId, passengerId)));
 
   if (existing) {
-    throw CustomError.conflict('You have already requested to join this ride.');
+    throw CustomError.conflict(DUPLICATE_REQUEST);
   }
 
   const [joinRequest] = await exec
@@ -54,11 +65,11 @@ export async function listRideRequests(rideId: string, driverId: string, exec: E
     .where(eq(rides.id, rideId));
 
   if (!ride) {
-    throw CustomError.notFound('Ride not found.');
+    throw CustomError.notFound(RIDE_NOT_FOUND);
   }
 
   if (ride.driverId !== driverId) {
-    throw CustomError.forbidden('Only the driver who owns this ride can view its requests.');
+    throw CustomError.forbidden(NOT_RIDE_OWNER_VIEW);
   }
 
   return exec
@@ -86,11 +97,11 @@ export async function acceptRequest(rideId: string, requestId: string, driverId:
     const [ride] = await tx.select().from(rides).where(eq(rides.id, rideId)).for('update');
 
     if (!ride) {
-      throw CustomError.notFound('Ride not found.');
+      throw CustomError.notFound(RIDE_NOT_FOUND);
     }
 
     if (ride.driverId !== driverId) {
-      throw CustomError.forbidden('Only the driver who owns this ride can accept its requests.');
+      throw CustomError.forbidden(NOT_RIDE_OWNER_ACCEPT);
     }
 
     const [joinRequest] = await tx
@@ -99,15 +110,15 @@ export async function acceptRequest(rideId: string, requestId: string, driverId:
       .where(and(eq(rideRequests.id, requestId), eq(rideRequests.rideId, rideId)));
 
     if (!joinRequest) {
-      throw CustomError.notFound('Request not found.');
+      throw CustomError.notFound(REQUEST_NOT_FOUND);
     }
 
     if (joinRequest.status !== 'PENDING') {
-      throw CustomError.conflict('This request has already been decided.');
+      throw CustomError.conflict(REQUEST_ALREADY_DECIDED);
     }
 
     if (ride.availableSeats <= 0) {
-      throw CustomError.conflict('No seats remain on this ride.');
+      throw CustomError.conflict(NO_SEATS_REMAINING);
     }
 
     const availableSeats = ride.availableSeats - 1;
@@ -145,11 +156,11 @@ export async function declineRequest(
     .where(eq(rides.id, rideId));
 
   if (!ride) {
-    throw CustomError.notFound('Ride not found.');
+    throw CustomError.notFound(RIDE_NOT_FOUND);
   }
 
   if (ride.driverId !== driverId) {
-    throw CustomError.forbidden('Only the driver who owns this ride can decline its requests.');
+    throw CustomError.forbidden(NOT_RIDE_OWNER_DECLINE);
   }
 
   const [joinRequest] = await exec
@@ -158,11 +169,11 @@ export async function declineRequest(
     .where(and(eq(rideRequests.id, requestId), eq(rideRequests.rideId, rideId)));
 
   if (!joinRequest) {
-    throw CustomError.notFound('Request not found.');
+    throw CustomError.notFound(REQUEST_NOT_FOUND);
   }
 
   if (joinRequest.status !== 'PENDING') {
-    throw CustomError.conflict('This request has already been decided.');
+    throw CustomError.conflict(REQUEST_ALREADY_DECIDED);
   }
 
   const [declined] = await exec
