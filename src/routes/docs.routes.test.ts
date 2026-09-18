@@ -22,8 +22,6 @@ describe('GET /api/docs/openapi.json', () => {
     expect(operations).toEqual(
       expect.arrayContaining([
         'get /health',
-        'post /register',
-        'post /login',
         'get /rides',
         'post /rides',
         'post /rides/{rideId}/requests',

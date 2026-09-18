@@ -18,7 +18,7 @@ registry.registerComponent('securitySchemes', SESSION_COOKIE_SCHEME, {
   type: 'apiKey',
   in: 'cookie',
   name: 'better-auth.session_token',
-  description: 'Session cookie issued by /api/login or /api/register.',
+  description: 'Session cookie issued by the sign-up and sign-in routes under /api/auth.',
 });
 
 type OpenApiDocument = ReturnType<OpenApiGeneratorV3['generateDocument']>;
