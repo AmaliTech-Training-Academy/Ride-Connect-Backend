@@ -93,3 +93,11 @@ export const updateRideStatusSchema = z.object({
 });
 
 export type UpdateRideStatusInput = z.infer<typeof updateRideStatusSchema>;
+
+/** What a status change returns: the ride's new standing, not the whole ride. */
+export const rideStatusResponseSchema = z.object({
+  id: z.uuid(),
+  driverId: z.uuid(),
+  status: z.enum(rideStatus.enumValues),
+  availableSeats: z.number().int(),
+});
