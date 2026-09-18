@@ -13,22 +13,25 @@ describe('GET /api/docs/openapi.json', () => {
     expect(response.body.success).toBeUndefined();
   });
 
+  // Exact, not a subset: a route added without `documentedRoute` fails here rather
+  // than going quietly missing from the reference.
   it('documents every mounted route, with path parameters in OpenAPI form', async () => {
     const response = await request(app).get('/api/docs/openapi.json');
     const operations = Object.entries(response.body.paths).flatMap(([path, item]) =>
       Object.keys(item as object).map((method) => `${method} ${path}`),
     );
 
-    expect(operations).toEqual(
-      expect.arrayContaining([
+    expect(operations.sort()).toEqual(
+      [
         'get /health',
         'get /rides',
         'post /rides',
+        'patch /rides/{rideId}/status',
         'post /rides/{rideId}/requests',
         'get /rides/{rideId}/requests',
         'patch /rides/{rideId}/requests/{requestId}/accept',
         'patch /rides/{rideId}/requests/{requestId}/decline',
-      ]),
+      ].sort(),
     );
   });
 
