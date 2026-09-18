@@ -7,26 +7,11 @@ import {
   declineRequest,
   listRideRequests,
 } from '../controllers/rideRequests.controller';
-import { createRide, listRides } from '../controllers/rides.controller';
-import {
-  errorEnvelope,
-  successEnvelope,
-  validationErrorEnvelope,
-} from '../lib/http/envelope.schema';
+import { createRide, listRides, updateRideStatus } from '../controllers/rides.controller';
 import { requireAuth } from '../middlewares/auth.middleware';
-import { documentedRoute } from '../middlewares/documentedRoute.middleware';
-import {
-  requestIdParamsSchema,
-  rideIdParamsSchema,
-  rideRequestDecisionSchema,
-  rideRequestResponseSchema,
-  rideRequestSummarySchema,
-} from '../validators/rideRequests.validator';
-import {
-  createRideSchema,
-  listRidesSchema,
-  rideResponseSchema,
-} from '../validators/rides.validator';
+import { validate } from '../middlewares/validate.middleware';
+import { requestIdParamsSchema, rideIdParamsSchema } from '../validators/rideRequests.validator';
+import { createRideSchema, listRidesSchema, updateRideStatusSchema } from '../validators/rides.validator';
 
 export const ridesRouter = Router();
 
@@ -69,6 +54,12 @@ ridesRouter.post(
     },
   }),
   createRide,
+);
+ridesRouter.patch(
+  '/:rideId/status',
+  requireAuth,
+  validate({ params: rideIdParamsSchema, body: updateRideStatusSchema }),
+  updateRideStatus,
 );
 
 ridesRouter.post(
