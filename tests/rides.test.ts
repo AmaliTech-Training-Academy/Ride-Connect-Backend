@@ -216,6 +216,21 @@ describe('GET /rides/mine', () => {
   });
 });
 
+describe('PATCH /rides/:rideId/cancel', () => {
+  it('allows a driver to cancel a ride they own', async () => {
+    const cookie = await registerDriver();
+    const created = await request(app).post('/api/rides').set('Cookie', cookie).send(validRide());
+
+    const response = await request(app).patch(`/api/rides/${created.body.data.id}/cancel`).set('Cookie', cookie);
+
+    expect(response.status).toBe(200);
+    expect(response.body.data.status).toBe('CANCELLED');
+
+    const [ride] = await db.select().from(rides).where(eq(rides.id, created.body.data.id));
+    expect(ride.status).toBe('CANCELLED');
+  });
+});
+
 describe('GET /rides', () => {
   it('rejects an unauthenticated request', async () => {
     const response = await request(app).get('/api/rides');

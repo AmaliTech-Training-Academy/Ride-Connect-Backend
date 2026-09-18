@@ -6,7 +6,7 @@ import {
   declineRequest,
   listRideRequests,
 } from '../controllers/rideRequests.controller';
-import { createRide, listMyRides, listRides } from '../controllers/rides.controller';
+import { cancelRide, createRide, listMyRides, listRides } from '../controllers/rides.controller';
 import { requireAuth } from '../middlewares/auth.middleware';
 import { validate } from '../middlewares/validate.middleware';
 import { requestIdParamsSchema, rideIdParamsSchema } from '../validators/rideRequests.validator';
@@ -17,6 +17,12 @@ export const ridesRouter = Router();
 ridesRouter.get('/', requireAuth, validate({ query: listRidesSchema }), listRides);
 ridesRouter.get('/mine', requireAuth, listMyRides);
 ridesRouter.post('/', requireAuth, validate({ body: createRideSchema }), createRide);
+ridesRouter.patch(
+  '/:rideId/cancel',
+  requireAuth,
+  validate({ params: rideIdParamsSchema }),
+  cancelRide,
+);
 ridesRouter.post(
   '/:rideId/requests',
   requireAuth,
