@@ -19,3 +19,24 @@ export const loginSchema = z.object({
 
 export type RegisterInput = z.infer<typeof registerSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;
+
+const authUserSchema = z.object({
+  id: z.uuid(),
+  name: z.string(),
+  email: z.email(),
+  emailVerified: z.boolean(),
+  image: z.string().nullable(),
+  createdAt: z.iso.datetime(),
+  updatedAt: z.iso.datetime(),
+});
+
+export const registerResponseSchema = z.object({
+  user: authUserSchema,
+  token: z.string().nullable(),
+});
+
+export const loginResponseSchema = z.object({
+  user: authUserSchema,
+  token: z.string(),
+  redirectTo: z.string(),
+});
