@@ -1,7 +1,7 @@
-import { and, asc, eq, gte, ilike, lt, or } from 'drizzle-orm';
+import { and, asc, eq, gte, ilike, inArray, lt, or } from 'drizzle-orm';
 
 import { db, type Executor } from '../db';
-import { rides, users } from '../db/schema';
+import { rideRequests, rides, users } from '../db/schema';
 import type { CreateRideInput, ListRidesQuery } from '../validators/rides.validator';
 
 /** Publishes a Ride on behalf of its Driver, with every offered seat still free. */
@@ -72,3 +72,59 @@ export async function listRides(filters: ListRidesQuery, exec: Executor = db) {
     .where(and(...conditions))
     .orderBy(asc(rides.departureAt));
 }
+
+/** Lists the rides a user is driving and the rides they are confirmed on. */
+export async function listMyRides(userId: string, exec: Executor = db) {
+  const driving = await exec
+    .select({
+      id: rides.id,
+      driverId: rides.driverId,
+      driverName: users.name,
+      origin: rides.origin,
+      destination: rides.destination,
+      routeDescription: rides.routeDescription,
+      departureAt: rides.departureAt,
+      totalSeats: rides.totalSeats,
+      availableSeats: rides.availableSeats,
+      status: rides.status,
+      createdAt: rides.createdAt,
+    })
+    .from(rides)
+    .innerJoin(users, eq(rides.driverId, users.id))
+    .where(eq(rides.driverId, userId))
+    .orderBy(asc(rides.departureAt));
+
+  const acceptedRideIds = await exec
+    .select({ rideId: rideRequests.rideId })
+    .from(rideRequests)
+    .where(and(eq(rideRequests.passengerId, userId), eq(rideRequests.status, 'ACCEPTED')));
+
+  const joined =
+    acceptedRideIds.length === 0
+      ? []
+      : await exec
+          .select({
+            id: rides.id,
+            driverId: rides.driverId,
+            driverName: users.name,
+            origin: rides.origin,
+            destination: rides.destination,
+            routeDescription: rides.routeDescription,
+            departureAt: rides.departureAt,
+            totalSeats: rides.totalSeats,
+            availableSeats: rides.availableSeats,
+            status: rides.status,
+            createdAt: rides.createdAt,
+          })
+          .from(rides)
+          .innerJoin(users, eq(rides.driverId, users.id))
+          .where(inArray(rides.id, acceptedRideIds.map(({ rideId }) => rideId)))
+          .orderBy(asc(rides.departureAt));
+
+  return {
+    driving: driving.filter((ride) => ride.status !== 'CANCELLED' && ride.status !== 'COMPLETED'),
+    joined,
+    pastAndCancelled: driving.filter((ride) => ride.status === 'CANCELLED' || ride.status === 'COMPLETED'),
+  };
+}
+
