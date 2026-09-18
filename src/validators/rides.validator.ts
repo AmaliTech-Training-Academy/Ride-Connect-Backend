@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { rideStatus } from '../db/schema';
+
 const MIN_SEATS = 1;
 const MAX_SEATS = 8;
 
@@ -69,3 +71,17 @@ export const listRidesSchema = z.object({
 });
 
 export type ListRidesQuery = z.infer<typeof listRidesSchema>;
+
+export const rideResponseSchema = z.object({
+  id: z.uuid(),
+  driverId: z.uuid(),
+  driverName: z.string(),
+  origin: z.string(),
+  destination: z.string(),
+  routeDescription: z.string().nullable(),
+  departureAt: z.iso.datetime(),
+  totalSeats: z.number().int(),
+  availableSeats: z.number().int(),
+  status: z.enum(rideStatus.enumValues),
+  createdAt: z.iso.datetime().nullable(),
+});
