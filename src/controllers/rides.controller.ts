@@ -1,5 +1,6 @@
 import { authedController } from '../lib/http/controller';
 import * as ridesService from '../services/rides.service';
+import type { RideIdParams } from '../validators/rideRequests.validator';
 import type { CreateRideInput, ListRidesQuery } from '../validators/rides.validator';
 
 /** POST /api/rides — publishes a Ride the authenticated User is driving. */
@@ -42,6 +43,16 @@ export const listMyRides = authedController(async (req, res) => {
   res.customSuccess({
     message: 'Your rides were fetched successfully',
     data: rides,
+  });
+});
+
+/** PATCH /api/rides/:rideId/cancel — driver cancels one of their own rides. */
+export const cancelRide = authedController<{ params: RideIdParams }>(async (req, res) => {
+  const ride = await ridesService.cancelRide(req.validated.params.rideId, req.auth.user.id);
+
+  res.customSuccess({
+    message: 'Ride cancelled successfully',
+    data: ride,
   });
 });
 
