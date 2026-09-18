@@ -167,6 +167,55 @@ describe('POST /rides', () => {
   });
 });
 
+describe('GET /rides/mine', () => {
+  it('lists rides the user is driving and rides they joined', async () => {
+    const driverCookie = await registerDriver();
+    const ownRide = await request(app).post('/api/rides').set('Cookie', driverCookie).send(validRide());
+
+    const passengerResponse = await request(app)
+      .post('/api/register')
+      .send({ name: 'Ada Lovelace', email: uniqueEmail('passenger'), password: VALID_PASSWORD });
+    const passengerCookie = passengerResponse.headers['set-cookie'];
+    const passengerAuthCookie = Array.isArray(passengerCookie) ? passengerCookie.join('; ') : passengerCookie;
+
+    const otherDriverResponse = await request(app)
+      .post('/api/register')
+      .send({ name: 'Alan Turing', email: uniqueEmail('driver-two'), password: VALID_PASSWORD });
+    const otherDriverCookie = otherDriverResponse.headers['set-cookie'];
+    const otherDriverAuthCookie = Array.isArray(otherDriverCookie) ? otherDriverCookie.join('; ') : otherDriverCookie;
+
+    const otherRide = await request(app)
+      .post('/api/rides')
+      .set('Cookie', otherDriverAuthCookie)
+      .send({ ...validRide(), origin: 'Tema', destination: 'Ho' });
+
+    const requestResponse = await request(app)
+      .post(`/api/rides/${otherRide.body.data.id}/requests`)
+      .set('Cookie', passengerAuthCookie);
+
+    await request(app)
+      .patch(`/api/rides/${otherRide.body.data.id}/requests/${requestResponse.body.data.id}/accept`)
+      .set('Cookie', otherDriverAuthCookie);
+
+    const response = await request(app).get('/api/rides/mine').set('Cookie', passengerAuthCookie);
+
+    expect(response.status).toBe(200);
+    expect(response.body.data.driving).toEqual([]);
+    expect(response.body.data.joined).toHaveLength(1);
+    expect(response.body.data.joined[0]).toMatchObject({
+      id: otherRide.body.data.id,
+      origin: 'Tema',
+      destination: 'Ho',
+      status: 'OPEN',
+    });
+
+    const myDriving = await request(app).get('/api/rides/mine').set('Cookie', driverCookie);
+    expect(myDriving.status).toBe(200);
+    expect(myDriving.body.data.driving).toHaveLength(1);
+    expect(myDriving.body.data.driving[0]).toMatchObject({ id: ownRide.body.data.id, status: 'OPEN' });
+  });
+});
+
 describe('GET /rides', () => {
   it('rejects an unauthenticated request', async () => {
     const response = await request(app).get('/api/rides');
