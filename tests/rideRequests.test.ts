@@ -18,19 +18,21 @@ interface AuthedUser {
   name: string;
 }
 
-/** Registers a brand new user and returns their session cookie and id. */
+/** Signs a brand new user up through better-auth and returns their session cookie and id. */
 async function registerUser(name: string): Promise<AuthedUser> {
   const email = uniqueEmail(name.toLowerCase().replace(/\s+/g, '-'));
-  const response = await request(app).post('/api/register').send({ name, email, password: VALID_PASSWORD });
+  const response = await request(app)
+    .post('/api/auth/sign-up/email')
+    .send({ name, email, password: VALID_PASSWORD });
 
   const cookie = response.headers['set-cookie'];
   if (!cookie) {
-    throw new Error('Register did not return a session cookie.');
+    throw new Error('Sign-up did not return a session cookie.');
   }
 
   return {
     cookie: Array.isArray(cookie) ? cookie.join('; ') : cookie,
-    userId: response.body.data.user.id,
+    userId: response.body.user.id,
     name,
   };
 }

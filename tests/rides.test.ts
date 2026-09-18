@@ -11,15 +11,15 @@ const app = createApp();
 
 const VALID_PASSWORD = 'careful-horse-8';
 
-/** Registers a new driver and returns their session cookie (better-auth auto-signs-in on register). */
+/** Signs a new driver up through better-auth and returns their session cookie. */
 async function registerDriver(): Promise<string> {
   const response = await request(app)
-    .post('/api/register')
+    .post('/api/auth/sign-up/email')
     .send({ name: 'Grace Hopper', email: uniqueEmail('driver'), password: VALID_PASSWORD });
 
   const cookie = response.headers['set-cookie'];
   if (!cookie) {
-    throw new Error('Register did not return a session cookie.');
+    throw new Error('Sign-up did not return a session cookie.');
   }
   return Array.isArray(cookie) ? cookie.join('; ') : cookie;
 }
