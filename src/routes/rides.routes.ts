@@ -8,12 +8,27 @@ import {
   listRideRequests,
 } from '../controllers/rideRequests.controller';
 import { createRide, listRides, updateRideStatus } from '../controllers/rides.controller';
+import {
+  errorEnvelope,
+  successEnvelope,
+  validationErrorEnvelope,
+} from '../lib/http/envelope.schema';
 import { requireAuth } from '../middlewares/auth.middleware';
-import { validate } from '../middlewares/validate.middleware';
-import { requestIdParamsSchema, rideIdParamsSchema, rideRequestDecisionSchema, rideRequestResponseSchema, rideRequestSummarySchema } from '../validators/rideRequests.validator';
-import { createRideSchema, listRidesSchema, rideResponseSchema, updateRideStatusSchema } from '../validators/rides.validator';
 import { documentedRoute } from '../middlewares/documentedRoute.middleware';
-import { errorEnvelope, successEnvelope, validationErrorEnvelope } from '../lib/http/envelope.schema';
+import {
+  requestIdParamsSchema,
+  rideIdParamsSchema,
+  rideRequestDecisionSchema,
+  rideRequestResponseSchema,
+  rideRequestSummarySchema,
+} from '../validators/rideRequests.validator';
+import {
+  createRideSchema,
+  listRidesSchema,
+  rideResponseSchema,
+  rideStatusResponseSchema,
+  updateRideStatusSchema,
+} from '../validators/rides.validator';
 
 export const ridesRouter = Router();
 
@@ -60,7 +75,26 @@ ridesRouter.post(
 ridesRouter.patch(
   '/:rideId/status',
   requireAuth,
-  validate({ params: rideIdParamsSchema, body: updateRideStatusSchema }),
+  documentedRoute({
+    method: 'patch',
+    path: '/rides/:rideId/status',
+    tags: ['Rides'],
+    summary: 'Change the status of your ride',
+    secured: true,
+    params: rideIdParamsSchema,
+    body: updateRideStatusSchema,
+    responses: {
+      200: { description: 'Status changed', schema: successEnvelope(rideStatusResponseSchema) },
+      400: { description: 'Unknown status, or malformed id', schema: validationErrorEnvelope },
+      401: unauthorized,
+      403: { description: 'Not the ride owner', schema: errorEnvelope },
+      404: { description: 'No such ride', schema: errorEnvelope },
+      409: {
+        description: 'Ride already cancelled or completed, or the change is not allowed',
+        schema: errorEnvelope,
+      },
+    },
+  }),
   updateRideStatus,
 );
 
