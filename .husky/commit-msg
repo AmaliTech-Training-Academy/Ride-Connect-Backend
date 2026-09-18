@@ -1,0 +1,1 @@
+node scripts/check-commit-messages.js --edit "$1"

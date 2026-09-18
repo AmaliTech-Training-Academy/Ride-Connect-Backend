@@ -1,0 +1,24 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Environment — real secrets. Keep .env.example tracked.
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+npm-debug.log*
+
+# Test / coverage output
+coverage/
+
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+
+docs/
