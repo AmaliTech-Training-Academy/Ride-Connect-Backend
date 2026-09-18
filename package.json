@@ -27,6 +27,8 @@
     "prepare": "husky"
   },
   "dependencies": {
+    "@asteasolutions/zod-to-openapi": "^9.1.0",
+    "@scalar/express-api-reference": "^0.10.19",
     "better-auth": "^1.7.4",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
