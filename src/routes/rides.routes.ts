@@ -10,8 +10,10 @@ import {
 import { createRide, listRides, updateRideStatus } from '../controllers/rides.controller';
 import { requireAuth } from '../middlewares/auth.middleware';
 import { validate } from '../middlewares/validate.middleware';
-import { requestIdParamsSchema, rideIdParamsSchema } from '../validators/rideRequests.validator';
-import { createRideSchema, listRidesSchema, updateRideStatusSchema } from '../validators/rides.validator';
+import { requestIdParamsSchema, rideIdParamsSchema, rideRequestDecisionSchema, rideRequestResponseSchema, rideRequestSummarySchema } from '../validators/rideRequests.validator';
+import { createRideSchema, listRidesSchema, rideResponseSchema, updateRideStatusSchema } from '../validators/rides.validator';
+import { documentedRoute } from '../middlewares/documentedRoute.middleware';
+import { errorEnvelope, successEnvelope, validationErrorEnvelope } from '../lib/http/envelope.schema';
 
 export const ridesRouter = Router();
 
