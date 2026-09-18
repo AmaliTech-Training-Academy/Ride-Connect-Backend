@@ -6,11 +6,17 @@ import {
   declineRequest,
   listRideRequests,
 } from '../controllers/rideRequests.controller';
-import { cancelRide, createRide, listMyRides, listRides } from '../controllers/rides.controller';
+import {
+  cancelRide,
+  createRide,
+  listMyRides,
+  listRides,
+  updateRideStatus,
+} from '../controllers/rides.controller';
 import { requireAuth } from '../middlewares/auth.middleware';
 import { validate } from '../middlewares/validate.middleware';
 import { requestIdParamsSchema, rideIdParamsSchema } from '../validators/rideRequests.validator';
-import { createRideSchema, listRidesSchema } from '../validators/rides.validator';
+import { createRideSchema, listRidesSchema, updateRideStatusSchema } from '../validators/rides.validator';
 
 export const ridesRouter = Router();
 
@@ -23,6 +29,13 @@ ridesRouter.patch(
   validate({ params: rideIdParamsSchema }),
   cancelRide,
 );
+ridesRouter.patch(
+  '/:rideId/status',
+  requireAuth,
+  validate({ params: rideIdParamsSchema, body: updateRideStatusSchema }),
+  updateRideStatus,
+);
+
 ridesRouter.post(
   '/:rideId/requests',
   requireAuth,

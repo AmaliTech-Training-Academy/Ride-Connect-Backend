@@ -1,7 +1,9 @@
 import { authedController } from '../lib/http/controller';
 import * as ridesService from '../services/rides.service';
 import type { RideIdParams } from '../validators/rideRequests.validator';
-import type { CreateRideInput, ListRidesQuery } from '../validators/rides.validator';
+import type { CreateRideInput, ListRidesQuery, UpdateRideStatusInput } from '../validators/rides.validator';
+
+const RIDE_STATUS_UPDATED = 'Ride status updated successfully';
 
 /** POST /api/rides — publishes a Ride the authenticated User is driving. */
 export const createRide = authedController<{ body: CreateRideInput }>(async (req, res) => {
@@ -56,3 +58,19 @@ export const cancelRide = authedController<{ params: RideIdParams }>(async (req,
   });
 });
 
+
+/** PATCH /api/rides/:rideId/status — the Driver manually closes, cancels, or reopens their Ride. */
+export const updateRideStatus = authedController<{ params: RideIdParams; body: UpdateRideStatusInput }>(
+  async (req, res) => {
+    const ride = await ridesService.updateRideStatus(
+      req.validated.params.rideId,
+      req.auth.user.id,
+      req.validated.body.status,
+    );
+
+    res.customSuccess({
+      message: RIDE_STATUS_UPDATED,
+      data: ride,
+    });
+  },
+);
