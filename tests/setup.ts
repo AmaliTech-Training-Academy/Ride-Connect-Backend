@@ -7,6 +7,9 @@
  * run against the development database and truncate real data.
  */
 import 'dotenv/config';
+import { sql } from 'drizzle-orm';
+import { drizzle } from 'drizzle-orm/node-postgres';
+import { Pool } from 'pg';
 import { vi } from 'vitest';
 
 (globalThis as typeof globalThis & { jest?: typeof vi }).jest = vi;
@@ -24,3 +27,12 @@ if (testDatabaseUrl === process.env.DATABASE_URL) {
 process.env.DATABASE_URL = testDatabaseUrl;
 process.env.BETTER_AUTH_SECRET ??= 'test-secret-not-used-outside-tests';
 process.env.BETTER_AUTH_URL ??= 'http://localhost:3000';
+
+const testPool = new Pool({ connectionString: testDatabaseUrl });
+const testDb = drizzle(testPool);
+
+await testDb.execute(
+  sql`ALTER TABLE IF EXISTS "rides" ADD COLUMN IF NOT EXISTS "route_description" varchar(500);`,
+);
+
+await testPool.end();
