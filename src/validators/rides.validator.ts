@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { rideStatus } from '../db/schema';
+
 const MIN_SEATS = 1;
 const MAX_SEATS = 8;
 
@@ -70,6 +72,20 @@ export const listRidesSchema = z.object({
 
 export type ListRidesQuery = z.infer<typeof listRidesSchema>;
 
+export const rideResponseSchema = z.object({
+  id: z.uuid(),
+  driverId: z.uuid(),
+  driverName: z.string(),
+  origin: z.string(),
+  destination: z.string(),
+  routeDescription: z.string().nullable(),
+  departureAt: z.iso.datetime(),
+  totalSeats: z.number().int(),
+  availableSeats: z.number().int(),
+  status: z.enum(rideStatus.enumValues),
+  createdAt: z.iso.datetime().nullable(),
+});
+
 export const updateRideStatusSchema = z.object({
   status: z.enum(['OPEN', 'FULL', 'CANCELLED'], {
     error: 'Status must be one of OPEN, FULL, or CANCELLED.',
@@ -77,3 +93,11 @@ export const updateRideStatusSchema = z.object({
 });
 
 export type UpdateRideStatusInput = z.infer<typeof updateRideStatusSchema>;
+
+/** What a status change returns: the ride's new standing, not the whole ride. */
+export const rideStatusResponseSchema = z.object({
+  id: z.uuid(),
+  driverId: z.uuid(),
+  status: z.enum(rideStatus.enumValues),
+  availableSeats: z.number().int(),
+});

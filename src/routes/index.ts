@@ -1,13 +1,32 @@
 import { Router } from 'express';
 
+import { env } from '../config/env';
 import { getHealth } from '../controllers/health.controller';
-import { authRouter } from './auth.routes';
+import { successEnvelope } from '../lib/http/envelope.schema';
+import { documentedRoute } from '../middlewares/documentedRoute.middleware';
+import { healthResponseSchema } from '../validators/health.validator';
+import { docsRouter } from './docs.routes';
 import { ridesRouter } from './rides.routes';
 
 export const apiRouter = Router();
 
 // No auth middleware: a session lookup would fail the liveness probe on a database blip.
-apiRouter.get('/health', getHealth);
+apiRouter.get(
+  '/health',
+  documentedRoute({
+    method: 'get',
+    path: '/health',
+    tags: ['Health'],
+    summary: 'Liveness probe',
+    responses: {
+      200: { description: 'Service is up', schema: successEnvelope(healthResponseSchema) },
+    },
+  }),
+  getHealth,
+);
 
-apiRouter.use(authRouter);
 apiRouter.use('/rides', ridesRouter);
+
+if (env.DOCS_ENABLED) {
+  apiRouter.use('/docs', docsRouter);
+}
