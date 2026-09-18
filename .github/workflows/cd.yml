@@ -5,7 +5,7 @@ on:
     branches:
       - develop
       - feat/t21-cd # running a test here so I do not have to wait for ci approval.
-
+# test comment to retrigger the workflow
 jobs:
   ci:
     uses: ./.github/workflows/ci.yml   # runs lint/test/build, must pass first
@@ -55,15 +55,16 @@ jobs:
       - name: Sync build to the server
         run: |
           ssh ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} "mkdir -p /opt/app/backend/current"
-          rsync -avz ./dist ./package.json ./package-lock.json \
+          rsync -avz ./dist ./drizzle ./package.json ./package-lock.json \
             ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:/opt/app/backend/current/
  
-      - name: Install prod deps, reload pm2
+      - name: Install prod deps, migrate, reload pm2
         run: |
           ssh ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} '
             set -e
             cd /opt/app/backend/current
             npm ci 
+            npm run db:migrate:deploy
             pm2 reload backend --update-env || pm2 start dist/server.js --name backend
           '
  
