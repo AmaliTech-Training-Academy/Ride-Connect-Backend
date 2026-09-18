@@ -1,10 +1,12 @@
 import { Router } from 'express';
 
+import { env } from '../config/env';
 import { getHealth } from '../controllers/health.controller';
 import { successEnvelope } from '../lib/http/envelope.schema';
 import { documentedRoute } from '../middlewares/documentedRoute.middleware';
 import { healthResponseSchema } from '../validators/health.validator';
 import { authRouter } from './auth.routes';
+import { docsRouter } from './docs.routes';
 import { ridesRouter } from './rides.routes';
 
 export const apiRouter = Router();
@@ -26,3 +28,7 @@ apiRouter.get(
 
 apiRouter.use(authRouter);
 apiRouter.use('/rides', ridesRouter);
+
+if (env.DOCS_ENABLED) {
+  apiRouter.use('/docs', docsRouter);
+}
