@@ -12,7 +12,7 @@ import { openAPI } from 'better-auth/plugins';
 import { env } from '../config/env';
 import { db, schema } from '../db';
 
-export const MIN_PASSWORD_LENGTH = 8;
+const MIN_PASSWORD_LENGTH = 8;
 
 export const auth = betterAuth({
   appName: 'RideConnect',
@@ -37,9 +37,7 @@ export const auth = betterAuth({
     // Both `requireEmailVerification: true` and `autoSignIn: false` switch
     // better-auth into returning a synthetic success for an already-registered
     // email, an anti-enumeration measure that would hide the duplicate from the
-    // caller. We need the conflict to surface, so both stay off and sign-up
-    // raises USER_ALREADY_EXISTS_USE_ANOTHER_EMAIL, which the error handler
-    // translates to 409.
+    // caller. We need the conflict to surface, so both stay off.
     autoSignIn: true,
   },
 
