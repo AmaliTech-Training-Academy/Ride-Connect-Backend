@@ -11,14 +11,22 @@ const CANNOT_JOIN_OWN_RIDE = 'You cannot request to join your own ride.';
 const RIDE_NOT_OPEN = 'This ride is not open for requests.';
 const DUPLICATE_REQUEST = 'You have already requested to join this ride.';
 const NO_SEATS_REMAINING = 'No seats remain on this ride.';
+const RIDE_CANCELLED = 'This ride has been cancelled.';
+const RIDE_COMPLETED = 'This ride has already completed.';
+const RIDE_FULL = 'This ride is full.';
 const NOT_RIDE_OWNER_VIEW = 'Only the driver who owns this ride can view its requests.';
 const NOT_RIDE_OWNER_ACCEPT = 'Only the driver who owns this ride can accept its requests.';
 const NOT_RIDE_OWNER_DECLINE = 'Only the driver who owns this ride can decline its requests.';
 
+/** True once a Ride's departure time has passed. */
+function hasDeparted(departureAt: Date): boolean {
+  return departureAt.getTime() <= Date.now();
+}
+
 /** Submits a passenger's request to join an open Ride. */
 export async function createRequest(rideId: string, passengerId: string, exec: Executor = db) {
   const [ride] = await exec
-    .select({ id: rides.id, driverId: rides.driverId, status: rides.status })
+    .select({ id: rides.id, driverId: rides.driverId, status: rides.status, departureAt: rides.departureAt })
     .from(rides)
     .where(eq(rides.id, rideId));
 
@@ -30,7 +38,7 @@ export async function createRequest(rideId: string, passengerId: string, exec: E
     throw CustomError.forbidden(CANNOT_JOIN_OWN_RIDE);
   }
 
-  if (ride.status !== 'OPEN') {
+  if (ride.status !== 'OPEN' || hasDeparted(ride.departureAt)) {
     throw CustomError.conflict(RIDE_NOT_OPEN);
   }
 
@@ -102,6 +110,18 @@ export async function acceptRequest(rideId: string, requestId: string, driverId:
 
     if (ride.driverId !== driverId) {
       throw CustomError.forbidden(NOT_RIDE_OWNER_ACCEPT);
+    }
+
+    if (ride.status === 'CANCELLED') {
+      throw CustomError.conflict(RIDE_CANCELLED);
+    }
+
+    if (ride.status === 'COMPLETED' || ((ride.status === 'OPEN' || ride.status === 'FULL') && hasDeparted(ride.departureAt))) {
+      throw CustomError.conflict(RIDE_COMPLETED);
+    }
+
+    if (ride.status === 'FULL') {
+      throw CustomError.conflict(RIDE_FULL);
     }
 
     const [joinRequest] = await tx
