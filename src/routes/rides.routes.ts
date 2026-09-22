@@ -29,13 +29,14 @@ import {
   rideRequestSummarySchema,
 } from '../validators/rideRequests.validator';
 import {
+  cancelledRideResponseSchema,
   createRideSchema,
   listRidesSchema,
+  myRidesResponseSchema,
   rideResponseSchema,
   rideStatusResponseSchema,
   updateRideStatusSchema,
 } from '../validators/rides.validator';
-import { validate } from '../middlewares/validate.middleware';
 
 export const ridesRouter = Router();
 
@@ -61,7 +62,24 @@ ridesRouter.get(
   listRides,
 );
 
-ridesRouter.get('/mine', requireAuth, listMyRides);
+// Registered before the `:rideId` routes so it is not swallowed as a ride id.
+ridesRouter.get(
+  '/mine',
+  requireAuth,
+  documentedRoute({
+    method: 'get',
+    path: '/rides/mine',
+    tags: ['Rides'],
+    summary: 'List the rides you drive and the ones you have joined',
+    secured: true,
+    responses: {
+      200: { description: 'Your rides', schema: successEnvelope(myRidesResponseSchema) },
+      401: unauthorized,
+    },
+  }),
+  listMyRides,
+);
+
 ridesRouter.post(
   '/',
   requireAuth,
@@ -83,7 +101,22 @@ ridesRouter.post(
 ridesRouter.patch(
   '/:rideId/cancel',
   requireAuth,
-  validate({ params: rideIdParamsSchema }),
+  documentedRoute({
+    method: 'patch',
+    path: '/rides/:rideId/cancel',
+    tags: ['Rides'],
+    summary: 'Cancel a ride you are driving',
+    secured: true,
+    params: rideIdParamsSchema,
+    responses: {
+      200: { description: 'Ride cancelled', schema: successEnvelope(cancelledRideResponseSchema) },
+      400: invalidParams,
+      401: unauthorized,
+      403: { description: 'Not the ride owner', schema: errorEnvelope },
+      404: { description: 'No such ride', schema: errorEnvelope },
+      409: { description: 'Ride already cancelled', schema: errorEnvelope },
+    },
+  }),
   cancelRide,
 );
 ridesRouter.patch(

@@ -101,3 +101,12 @@ export const rideStatusResponseSchema = z.object({
   status: z.enum(rideStatus.enumValues),
   availableSeats: z.number().int(),
 });
+
+/** The dashboard split: rides the caller drives, and rides they hold an accepted seat on. */
+export const myRidesResponseSchema = z.object({
+  driving: z.array(rideResponseSchema),
+  joined: z.array(rideResponseSchema),
+});
+
+/** A cancelled ride. The driver is the caller, so the row is returned without their name. */
+export const cancelledRideResponseSchema = rideResponseSchema.omit({ driverName: true });
