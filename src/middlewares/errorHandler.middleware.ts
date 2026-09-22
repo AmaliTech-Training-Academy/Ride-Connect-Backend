@@ -5,37 +5,6 @@ import { z } from 'zod';
 import { CustomError, sendCustomError } from '../lib/http/errors';
 import { logger } from '../lib/logger';
 
-const authErrorMap: Record<string, { status: number; message: string }> = {
-  USER_ALREADY_EXISTS: {
-    status: 409,
-    message: 'An account with this email already exists.',
-  },
-  USER_ALREADY_EXISTS_USE_ANOTHER_EMAIL: {
-    status: 409,
-    message: 'An account with this email already exists.',
-  },
-  INVALID_EMAIL_OR_PASSWORD: {
-    status: 401,
-    message: 'Invalid email or password',
-  },
-  INVALID_PASSWORD: {
-    status: 401,
-    message: 'Invalid email or password',
-  },
-  PASSWORD_TOO_SHORT: {
-    status: 400,
-    message: 'Password must be at least 8 characters.',
-  },
-  PASSWORD_TOO_LONG: {
-    status: 400,
-    message: 'Password is too long.',
-  },
-  INVALID_EMAIL: {
-    status: 400,
-    message: 'Please provide a valid email address.',
-  },
-};
-
 const isBodyParserError = (err: unknown): boolean => err instanceof SyntaxError && 'body' in err;
 
 const isUniqueViolation = (err: unknown): boolean =>
@@ -47,10 +16,9 @@ const toCustomError = (err: unknown): CustomError | undefined => {
   }
 
   if (isAPIError(err)) {
+    const status = err.statusCode;
+    const message = err.body?.message ?? 'Authentication request failed.';
     const code = err.body?.code;
-    const mapped = code ? authErrorMap[code] : undefined;
-    const status = mapped?.status ?? err.statusCode;
-    const message = mapped?.message ?? err.body?.message ?? 'Authentication request failed.';
     // Codes differ between a wrong password and an unknown email; a 401 must not.
     const details = code && status !== 401 ? { code } : undefined;
 

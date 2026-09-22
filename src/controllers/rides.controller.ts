@@ -39,6 +39,7 @@ export const listRides = authedController<{ query: ListRidesQuery }>(async (req,
 });
 
 /** GET /api/rides/mine — returns rides a user is driving and rides they are confirmed on. */
+/** GET /api/rides/mine — the caller's own rides, split into ones they drive and ones they joined. */
 export const listMyRides = authedController(async (req, res) => {
   const rides = await ridesService.listMyRides(req.auth.user.id);
 
@@ -57,7 +58,6 @@ export const cancelRide = authedController<{ params: RideIdParams }>(async (req,
     data: ride,
   });
 });
-
 
 /** PATCH /api/rides/:rideId/status — the Driver manually closes, cancels, or reopens their Ride. */
 export const updateRideStatus = authedController<{ params: RideIdParams; body: UpdateRideStatusInput }>(
