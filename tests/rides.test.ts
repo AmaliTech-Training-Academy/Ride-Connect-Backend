@@ -11,11 +11,11 @@ const app = createApp();
 
 const VALID_PASSWORD = 'careful-horse-8';
 
-/** Signs a new driver up through better-auth and returns their session cookie. */
-async function registerDriver(): Promise<string> {
+/** Signs a new user up through better-auth and returns their session cookie. */
+async function registerUser(name: string, emailPrefix: string): Promise<string> {
   const response = await request(app)
     .post('/api/auth/sign-up/email')
-    .send({ name: 'Grace Hopper', email: uniqueEmail('driver'), password: VALID_PASSWORD });
+    .send({ name, email: uniqueEmail(emailPrefix), password: VALID_PASSWORD });
 
   const cookie = response.headers['set-cookie'];
   if (!cookie) {
@@ -23,6 +23,8 @@ async function registerDriver(): Promise<string> {
   }
   return Array.isArray(cookie) ? cookie.join('; ') : cookie;
 }
+
+const registerDriver = (): Promise<string> => registerUser('Grace Hopper', 'driver');
 
 function daysFromNow(n: number): { date: string; time: string } {
   const date = new Date(Date.now() + n * 24 * 60 * 60 * 1000);
@@ -172,17 +174,8 @@ describe('GET /rides/mine', () => {
     const driverCookie = await registerDriver();
     const ownRide = await request(app).post('/api/rides').set('Cookie', driverCookie).send(validRide());
 
-    const passengerResponse = await request(app)
-      .post('/api/register')
-      .send({ name: 'Ada Lovelace', email: uniqueEmail('passenger'), password: VALID_PASSWORD });
-    const passengerCookie = passengerResponse.headers['set-cookie'];
-    const passengerAuthCookie = Array.isArray(passengerCookie) ? passengerCookie.join('; ') : passengerCookie;
-
-    const otherDriverResponse = await request(app)
-      .post('/api/register')
-      .send({ name: 'Alan Turing', email: uniqueEmail('driver-two'), password: VALID_PASSWORD });
-    const otherDriverCookie = otherDriverResponse.headers['set-cookie'];
-    const otherDriverAuthCookie = Array.isArray(otherDriverCookie) ? otherDriverCookie.join('; ') : otherDriverCookie;
+    const passengerAuthCookie = await registerUser('Ada Lovelace', 'passenger');
+    const otherDriverAuthCookie = await registerUser('Alan Turing', 'driver-two');
 
     const otherRide = await request(app)
       .post('/api/rides')
