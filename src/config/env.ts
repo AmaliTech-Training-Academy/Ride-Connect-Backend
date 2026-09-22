@@ -12,6 +12,9 @@ export const envSchema = z.object({
   DATABASE_URL: z.string().min(1),
   BETTER_AUTH_SECRET: z.string().min(32),
   BETTER_AUTH_URL: z.url(),
+  // Off switch for /api/docs: the reference exposes every route and a live
+  // request console, which a locked-down deployment may not want reachable.
+  DOCS_ENABLED: z.stringbool().default(true),
   TRUSTED_ORIGINS: z
     .string()
     .default('')
