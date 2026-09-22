@@ -7,7 +7,13 @@ import {
   declineRequest,
   listRideRequests,
 } from '../controllers/rideRequests.controller';
-import { createRide, listRides, updateRideStatus } from '../controllers/rides.controller';
+import {
+  cancelRide,
+  createRide,
+  listMyRides,
+  listRides,
+  updateRideStatus,
+} from '../controllers/rides.controller';
 import {
   errorEnvelope,
   successEnvelope,
@@ -29,6 +35,7 @@ import {
   rideStatusResponseSchema,
   updateRideStatusSchema,
 } from '../validators/rides.validator';
+import { validate } from '../middlewares/validate.middleware';
 
 export const ridesRouter = Router();
 
@@ -54,6 +61,7 @@ ridesRouter.get(
   listRides,
 );
 
+ridesRouter.get('/mine', requireAuth, listMyRides);
 ridesRouter.post(
   '/',
   requireAuth,
@@ -71,6 +79,12 @@ ridesRouter.post(
     },
   }),
   createRide,
+);
+ridesRouter.patch(
+  '/:rideId/cancel',
+  requireAuth,
+  validate({ params: rideIdParamsSchema }),
+  cancelRide,
 );
 ridesRouter.patch(
   '/:rideId/status',
