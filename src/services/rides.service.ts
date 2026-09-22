@@ -122,7 +122,8 @@ async function loadRequestSummaries(rideIds: string[], exec: Executor) {
     })
     .from(rideRequests)
     .innerJoin(users, eq(rideRequests.passengerId, users.id))
-    .where(and(inArray(rideRequests.rideId, rideIds), inArray(rideRequests.status, ['PENDING', 'ACCEPTED'])));
+    .where(and(inArray(rideRequests.rideId, rideIds), inArray(rideRequests.status, ['PENDING', 'ACCEPTED'])))
+    .orderBy(asc(rideRequests.createdAt));
 
   for (const request of requests) {
     const summary = summaries.get(request.rideId);
