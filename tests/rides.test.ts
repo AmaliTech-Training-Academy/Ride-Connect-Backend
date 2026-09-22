@@ -209,6 +209,56 @@ describe('GET /rides/mine', () => {
   });
 });
 
+describe('GET /rides/mine — request visibility', () => {
+  it("includes a driver's pending requests and confirmed passengers on each ride", async () => {
+    const driverCookie = await registerDriver();
+    const ride = await request(app).post('/api/rides').set('Cookie', driverCookie).send(validRide());
+
+    const acceptedAuthCookie = await registerUser('Yaw Boateng', 'accepted');
+    const pendingAuthCookie = await registerUser('Esi Ofori', 'pending');
+
+    const acceptedRequest = await request(app)
+      .post(`/api/rides/${ride.body.data.id}/requests`)
+      .set('Cookie', acceptedAuthCookie);
+    await request(app).post(`/api/rides/${ride.body.data.id}/requests`).set('Cookie', pendingAuthCookie);
+
+    await request(app)
+      .patch(`/api/rides/${ride.body.data.id}/requests/${acceptedRequest.body.data.id}/accept`)
+      .set('Cookie', driverCookie);
+
+    const response = await request(app).get('/api/rides/mine').set('Cookie', driverCookie);
+
+    expect(response.status).toBe(200);
+    expect(response.body.data.driving[0].pendingRequests).toHaveLength(1);
+    expect(response.body.data.driving[0].pendingRequests[0]).toMatchObject({ passengerName: 'Esi Ofori' });
+    expect(response.body.data.driving[0].confirmedPassengers).toHaveLength(1);
+    expect(response.body.data.driving[0].confirmedPassengers[0]).toMatchObject({ passengerName: 'Yaw Boateng' });
+  });
+
+  it("shows a passenger their own request status, even while pending or after being declined", async () => {
+    const driverCookie = await registerDriver();
+    const ride = await request(app).post('/api/rides').set('Cookie', driverCookie).send(validRide());
+
+    const passengerAuthCookie = await registerUser('Kojo Mensah', 'passenger');
+
+    const joinRequest = await request(app)
+      .post(`/api/rides/${ride.body.data.id}/requests`)
+      .set('Cookie', passengerAuthCookie);
+
+    const pendingView = await request(app).get('/api/rides/mine').set('Cookie', passengerAuthCookie);
+    expect(pendingView.body.data.joined).toHaveLength(1);
+    expect(pendingView.body.data.joined[0]).toMatchObject({ id: ride.body.data.id, requestStatus: 'PENDING' });
+
+    await request(app)
+      .patch(`/api/rides/${ride.body.data.id}/requests/${joinRequest.body.data.id}/decline`)
+      .set('Cookie', driverCookie);
+
+    const declinedView = await request(app).get('/api/rides/mine').set('Cookie', passengerAuthCookie);
+    expect(declinedView.body.data.joined).toHaveLength(1);
+    expect(declinedView.body.data.joined[0]).toMatchObject({ id: ride.body.data.id, requestStatus: 'DECLINED' });
+  });
+});
+
 describe('PATCH /rides/:rideId/cancel', () => {
   it('allows a driver to cancel a ride they own', async () => {
     const cookie = await registerDriver();
