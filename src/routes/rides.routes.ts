@@ -70,7 +70,7 @@ ridesRouter.get(
     method: 'get',
     path: '/rides/mine',
     tags: ['Rides'],
-    summary: 'List the rides you drive and the ones you have joined',
+    summary: 'Dashboard - List the rides you drive and the ones you have joined',
     secured: true,
     responses: {
       200: { description: 'Your rides', schema: successEnvelope(myRidesResponseSchema) },
