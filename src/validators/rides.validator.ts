@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { rideStatus } from '../db/schema';
+import { requestStatus, rideStatus } from '../db/schema';
 
 const MIN_SEATS = 1;
 const MAX_SEATS = 8;
@@ -102,10 +102,40 @@ export const rideStatusResponseSchema = z.object({
   availableSeats: z.number().int(),
 });
 
-/** The dashboard split: rides the caller drives, and rides they hold an accepted seat on. */
+/** A pending join request as the driver sees it on their dashboard. */
+export const pendingRequestSummarySchema = z.object({
+  id: z.uuid(),
+  passengerId: z.uuid(),
+  passengerName: z.string(),
+  createdAt: z.iso.datetime().nullable(),
+});
+
+/** A passenger holding an accepted seat, as the driver sees it on their dashboard. */
+export const confirmedPassengerSchema = z.object({
+  id: z.uuid(),
+  passengerId: z.uuid(),
+  passengerName: z.string(),
+});
+
+/** A ride the caller drives, with who's waiting on it and who's confirmed. */
+export const drivingRideResponseSchema = rideResponseSchema.extend({
+  pendingRequests: z.array(pendingRequestSummarySchema),
+  confirmedPassengers: z.array(confirmedPassengerSchema),
+});
+
+/** A ride the caller has requested to join, carrying their own request's status. */
+export const joinedRideResponseSchema = rideResponseSchema.extend({
+  requestId: z.uuid(),
+  requestStatus: z.enum(requestStatus.enumValues),
+  requestedAt: z.iso.datetime().nullable(),
+});
+
+/** The dashboard split: rides the caller drives and rides they've requested to join, each upcoming and past. */
 export const myRidesResponseSchema = z.object({
-  driving: z.array(rideResponseSchema),
-  joined: z.array(rideResponseSchema),
+  driving: z.array(drivingRideResponseSchema),
+  joined: z.array(joinedRideResponseSchema),
+  pastAndCancelled: z.array(drivingRideResponseSchema),
+  joinedPastAndCancelled: z.array(joinedRideResponseSchema),
 });
 
 /** A cancelled ride. The driver is the caller, so the row is returned without their name. */
