@@ -2,6 +2,62 @@ import request from 'supertest';
 
 import { app } from '../app';
 
+interface RouterLayer {
+  route?: { path: string; methods: Record<string, boolean> };
+  handle?: { stack?: RouterLayer[] };
+  regexp: RegExp;
+}
+
+/** Turns `^\/rides\/?(?=\/|$)`, the regexp Express builds for a mount, back into `/rides`. */
+const decodeMount = (regexp: RegExp): string =>
+  regexp.source
+    .replace(/^\^/, '')
+    .replace(/\\\/\?\(\?=\\\/\|\$\)$/, '')
+    .replace(/\\\//g, '/');
+
+function collectRoutes(stack: RouterLayer[], prefix: string, found: string[]): void {
+  for (const layer of stack) {
+    if (layer.route) {
+      const path = `${prefix}${layer.route.path}`.replace(/(.)\/$/, '$1');
+
+      for (const method of Object.keys(layer.route.methods)) {
+        found.push(`${method} ${path}`);
+      }
+      continue;
+    }
+
+    if (layer.handle?.stack) {
+      collectRoutes(layer.handle.stack, prefix + decodeMount(layer.regexp), found);
+    }
+  }
+}
+
+/**
+ * Every route Express actually serves under `/api`, in OpenAPI path form.
+ *
+ * Walks the router rather than a hand-kept list, so a route mounted without
+ * `documentedRoute` turns up here and fails the comparison.
+ *
+ * `/auth/*` is better-auth's own handler, described by its own schema, and
+ * `/docs` is the reference itself. Neither belongs in our document.
+ */
+function mountedApiRoutes(): string[] {
+  const internals = app as unknown as {
+    _router?: { stack: RouterLayer[] };
+    router?: { stack: RouterLayer[] };
+  };
+  const stack = (internals._router ?? internals.router)?.stack ?? [];
+  const found: string[] = [];
+
+  collectRoutes(stack, '', found);
+
+  return found
+    .filter((entry) => entry.includes(' /api/'))
+    .map((entry) => entry.replace(' /api', ' ').replace(/:([A-Za-z0-9_]+)/g, '{$1}'))
+    .filter((entry) => !entry.includes(' /auth') && !entry.includes(' /docs'))
+    .sort();
+}
+
 describe('GET /api/docs/openapi.json', () => {
   it('serves the spec unenveloped, so an OpenAPI client can read it', async () => {
     const response = await request(app).get('/api/docs/openapi.json');
@@ -13,26 +69,17 @@ describe('GET /api/docs/openapi.json', () => {
     expect(response.body.success).toBeUndefined();
   });
 
-  // Exact, not a subset: a route added without `documentedRoute` fails here rather
-  // than going quietly missing from the reference.
-  it('documents every mounted route, with path parameters in OpenAPI form', async () => {
+  it('documents every route Express serves, with path parameters in OpenAPI form', async () => {
     const response = await request(app).get('/api/docs/openapi.json');
-    const operations = Object.entries(response.body.paths).flatMap(([path, item]) =>
-      Object.keys(item as object).map((method) => `${method} ${path}`),
-    );
+    const documented = Object.entries(response.body.paths)
+      .flatMap(([path, item]) => Object.keys(item as object).map((method) => `${method} ${path}`))
+      .sort();
 
-    expect(operations.sort()).toEqual(
-      [
-        'get /health',
-        'get /rides',
-        'post /rides',
-        'patch /rides/{rideId}/status',
-        'post /rides/{rideId}/requests',
-        'get /rides/{rideId}/requests',
-        'patch /rides/{rideId}/requests/{requestId}/accept',
-        'patch /rides/{rideId}/requests/{requestId}/decline',
-      ].sort(),
-    );
+    expect(documented).toEqual(mountedApiRoutes());
+  });
+
+  it('finds the routes it is comparing against', () => {
+    expect(mountedApiRoutes().length).toBeGreaterThan(5);
   });
 
   it('describes the ride body by the fields the caller sends, not the transformed ones', async () => {
