@@ -89,7 +89,73 @@ export async function listRides(filters: ListRidesQuery, exec: Executor = db) {
     .orderBy(asc(rides.departureAt));
 }
 
-/** Lists the rides a user is driving and the rides they are confirmed on. */
+/** True once a Ride has been cancelled or has run its course. */
+function isPastOrCancelled(ride: { status: string }): boolean {
+  return ride.status === 'CANCELLED' || ride.status === 'COMPLETED';
+}
+
+/**
+ * Groups a set of Rides' pending join requests and confirmed passengers by ride id, for the
+ * driver's dashboard.
+ */
+async function loadRequestSummaries(rideIds: string[], exec: Executor) {
+  const summaries = new Map<
+    string,
+    {
+      pendingRequests: { id: string; passengerId: string; passengerName: string; createdAt: Date | null }[];
+      confirmedPassengers: { id: string; passengerId: string; passengerName: string }[];
+    }
+  >(rideIds.map((rideId) => [rideId, { pendingRequests: [], confirmedPassengers: [] }]));
+
+  if (rideIds.length === 0) {
+    return summaries;
+  }
+
+  const requests = await exec
+    .select({
+      rideId: rideRequests.rideId,
+      id: rideRequests.id,
+      passengerId: rideRequests.passengerId,
+      passengerName: users.name,
+      status: rideRequests.status,
+      createdAt: rideRequests.createdAt,
+    })
+    .from(rideRequests)
+    .innerJoin(users, eq(rideRequests.passengerId, users.id))
+    .where(and(inArray(rideRequests.rideId, rideIds), inArray(rideRequests.status, ['PENDING', 'ACCEPTED'])));
+
+  for (const request of requests) {
+    const summary = summaries.get(request.rideId);
+    if (!summary) {
+      continue;
+    }
+
+    if (request.status === 'PENDING') {
+      summary.pendingRequests.push({
+        id: request.id,
+        passengerId: request.passengerId,
+        passengerName: request.passengerName,
+        createdAt: request.createdAt,
+      });
+    } else {
+      summary.confirmedPassengers.push({
+        id: request.id,
+        passengerId: request.passengerId,
+        passengerName: request.passengerName,
+      });
+    }
+  }
+
+  return summaries;
+}
+
+/**
+ * Lists the rides a user is driving and the rides they've requested to join.
+ *
+ * Driven rides carry their pending requests and confirmed passengers so the dashboard doesn't
+ * need a follow-up call per ride. Joined rides carry the passenger's own request status
+ * (pending, accepted, or declined) so a request never silently disappears from their view.
+ */
 export async function listMyRides(userId: string, exec: Executor = db) {
   const driving = await exec
     .select({
@@ -110,13 +176,30 @@ export async function listMyRides(userId: string, exec: Executor = db) {
     .where(eq(rides.driverId, userId))
     .orderBy(asc(rides.departureAt));
 
-  const acceptedRideIds = await exec
-    .select({ rideId: rideRequests.rideId })
+  const requestSummaries = await loadRequestSummaries(
+    driving.map((ride) => ride.id),
+    exec,
+  );
+
+  const drivingWithRequests = driving.map((ride) => ({
+    ...ride,
+    ...requestSummaries.get(ride.id)!,
+  }));
+
+  const myRequests = await exec
+    .select({
+      rideId: rideRequests.rideId,
+      requestId: rideRequests.id,
+      requestStatus: rideRequests.status,
+      requestedAt: rideRequests.createdAt,
+    })
     .from(rideRequests)
-    .where(and(eq(rideRequests.passengerId, userId), eq(rideRequests.status, 'ACCEPTED')));
+    .where(eq(rideRequests.passengerId, userId));
+
+  const requestByRideId = new Map(myRequests.map((request) => [request.rideId, request]));
 
   const joined =
-    acceptedRideIds.length === 0
+    myRequests.length === 0
       ? []
       : await exec
           .select({
@@ -134,13 +217,29 @@ export async function listMyRides(userId: string, exec: Executor = db) {
           })
           .from(rides)
           .innerJoin(users, eq(rides.driverId, users.id))
-          .where(inArray(rides.id, acceptedRideIds.map(({ rideId }) => rideId)))
+          .where(
+            inArray(
+              rides.id,
+              myRequests.map((request) => request.rideId),
+            ),
+          )
           .orderBy(asc(rides.departureAt));
 
+  const joinedWithStatus = joined.map((ride) => {
+    const myRequest = requestByRideId.get(ride.id)!;
+    return {
+      ...ride,
+      requestId: myRequest.requestId,
+      requestStatus: myRequest.requestStatus,
+      requestedAt: myRequest.requestedAt,
+    };
+  });
+
   return {
-    driving: driving.filter((ride) => ride.status !== 'CANCELLED' && ride.status !== 'COMPLETED'),
-    joined,
-    pastAndCancelled: driving.filter((ride) => ride.status === 'CANCELLED' || ride.status === 'COMPLETED'),
+    driving: drivingWithRequests.filter((ride) => !isPastOrCancelled(ride)),
+    joined: joinedWithStatus.filter((ride) => !isPastOrCancelled(ride)),
+    pastAndCancelled: drivingWithRequests.filter(isPastOrCancelled),
+    joinedPastAndCancelled: joinedWithStatus.filter(isPastOrCancelled),
   };
 }
 
