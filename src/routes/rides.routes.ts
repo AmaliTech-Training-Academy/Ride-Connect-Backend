@@ -6,6 +6,7 @@ import {
   createRequest,
   declineRequest,
   listRideRequests,
+  withdrawRequest,
 } from '../controllers/rideRequests.controller';
 import {
   cancelRide,
@@ -233,4 +234,26 @@ ridesRouter.patch(
     },
   }),
   declineRequest,
+);
+
+ridesRouter.patch(
+  '/:rideId/requests/:requestId/withdraw',
+  requireAuth,
+  documentedRoute({
+    method: 'patch',
+    path: '/rides/:rideId/requests/:requestId/withdraw',
+    tags: ['Ride requests'],
+    summary: 'Withdraw your own request, or leave a ride you were accepted onto',
+    secured: true,
+    params: requestIdParamsSchema,
+    responses: {
+      200: { description: 'Request withdrawn', schema: successEnvelope(rideRequestDecisionSchema) },
+      400: invalidParams,
+      401: unauthorized,
+      403: { description: 'Not your request', schema: errorEnvelope },
+      404: { description: 'No such ride or request', schema: errorEnvelope },
+      409: { description: 'Already declined or withdrawn', schema: errorEnvelope },
+    },
+  }),
+  withdrawRequest,
 );

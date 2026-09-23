@@ -345,3 +345,108 @@ describe('PATCH /rides/:rideId/requests/:requestId/decline', () => {
     expect(response.status).toBe(409);
   });
 });
+
+describe('PATCH /rides/:rideId/requests/:requestId/withdraw', () => {
+  it('withdraws a pending request without changing seat availability', async () => {
+    const driver = await registerUser('Grace Hopper');
+    const ride = await postRide(driver, { availableSeats: 2 });
+    const passenger = await registerUser('Ada Lovelace');
+    const created = await requestToJoin(ride.id, passenger);
+
+    const response = await request(app)
+      .patch(`/api/rides/${ride.id}/requests/${created.body.data.id}/withdraw`)
+      .set('Cookie', passenger.cookie);
+
+    expect(response.status).toBe(200);
+    expect(response.body.data.status).toBe('WITHDRAWN');
+
+    const [updatedRide] = await db.select().from(rides).where(eq(rides.id, ride.id));
+    expect(updatedRide.availableSeats).toBe(2);
+  });
+
+  it('withdrawing an accepted request gives back the seat', async () => {
+    const driver = await registerUser('Grace Hopper');
+    const ride = await postRide(driver, { availableSeats: 2 });
+    const passenger = await registerUser('Ada Lovelace');
+    const created = await requestToJoin(ride.id, passenger);
+    await request(app)
+      .patch(`/api/rides/${ride.id}/requests/${created.body.data.id}/accept`)
+      .set('Cookie', driver.cookie);
+
+    const response = await request(app)
+      .patch(`/api/rides/${ride.id}/requests/${created.body.data.id}/withdraw`)
+      .set('Cookie', passenger.cookie);
+
+    expect(response.status).toBe(200);
+    expect(response.body.data.status).toBe('WITHDRAWN');
+
+    const [updatedRide] = await db.select().from(rides).where(eq(rides.id, ride.id));
+    expect(updatedRide.availableSeats).toBe(2);
+  });
+
+  it('reopens a FULL ride when the withdrawing passenger held the last seat', async () => {
+    const driver = await registerUser('Grace Hopper');
+    const ride = await postRide(driver, { availableSeats: 1 });
+    const passenger = await registerUser('Ada Lovelace');
+    const created = await requestToJoin(ride.id, passenger);
+    await request(app)
+      .patch(`/api/rides/${ride.id}/requests/${created.body.data.id}/accept`)
+      .set('Cookie', driver.cookie);
+
+    const response = await request(app)
+      .patch(`/api/rides/${ride.id}/requests/${created.body.data.id}/withdraw`)
+      .set('Cookie', passenger.cookie);
+
+    expect(response.status).toBe(200);
+
+    const [updatedRide] = await db.select().from(rides).where(eq(rides.id, ride.id));
+    expect(updatedRide.availableSeats).toBe(1);
+    expect(updatedRide.status).toBe('OPEN');
+  });
+
+  it('rejects withdrawing a request that belongs to someone else', async () => {
+    const driver = await registerUser('Grace Hopper');
+    const ride = await postRide(driver);
+    const passenger = await registerUser('Ada Lovelace');
+    const created = await requestToJoin(ride.id, passenger);
+    const someoneElse = await registerUser('Alan Turing');
+
+    const response = await request(app)
+      .patch(`/api/rides/${ride.id}/requests/${created.body.data.id}/withdraw`)
+      .set('Cookie', someoneElse.cookie);
+
+    expect(response.status).toBe(403);
+  });
+
+  it('rejects withdrawing a request that was already declined', async () => {
+    const driver = await registerUser('Grace Hopper');
+    const ride = await postRide(driver);
+    const passenger = await registerUser('Ada Lovelace');
+    const created = await requestToJoin(ride.id, passenger);
+    await request(app)
+      .patch(`/api/rides/${ride.id}/requests/${created.body.data.id}/decline`)
+      .set('Cookie', driver.cookie);
+
+    const response = await request(app)
+      .patch(`/api/rides/${ride.id}/requests/${created.body.data.id}/withdraw`)
+      .set('Cookie', passenger.cookie);
+
+    expect(response.status).toBe(409);
+  });
+
+  it('rejects withdrawing a request that was already withdrawn', async () => {
+    const driver = await registerUser('Grace Hopper');
+    const ride = await postRide(driver);
+    const passenger = await registerUser('Ada Lovelace');
+    const created = await requestToJoin(ride.id, passenger);
+    await request(app)
+      .patch(`/api/rides/${ride.id}/requests/${created.body.data.id}/withdraw`)
+      .set('Cookie', passenger.cookie);
+
+    const response = await request(app)
+      .patch(`/api/rides/${ride.id}/requests/${created.body.data.id}/withdraw`)
+      .set('Cookie', passenger.cookie);
+
+    expect(response.status).toBe(409);
+  });
+});
