@@ -7,6 +7,7 @@ const NO_PENDING_REQUESTS = 'No pending requests for this ride.';
 const REQUESTS_FETCHED = 'Requests fetched successfully';
 const REQUEST_ACCEPTED = 'Request accepted successfully';
 const REQUEST_DECLINED = 'Request declined successfully';
+const REQUEST_WITHDRAWN = 'Request withdrawn successfully';
 
 /** POST /api/rides/:rideId/requests — a passenger asks to join an open Ride. */
 export const createRequest = authedController<{ params: RideIdParams }>(async (req, res) => {
@@ -59,6 +60,23 @@ export const declineRequest = authedController<{ params: RequestIdParams }>(asyn
 
   res.customSuccess({
     message: REQUEST_DECLINED,
+    data: request,
+  });
+});
+
+/**
+ * PATCH /api/rides/:rideId/requests/:requestId/withdraw — the Passenger withdraws their own
+ * request, cancelling it if still pending or giving up their seat if it was accepted.
+ */
+export const withdrawRequest = authedController<{ params: RequestIdParams }>(async (req, res) => {
+  const request = await rideRequestsService.withdrawRequest(
+    req.validated.params.rideId,
+    req.validated.params.requestId,
+    req.auth.user.id,
+  );
+
+  res.customSuccess({
+    message: REQUEST_WITHDRAWN,
     data: request,
   });
 });
