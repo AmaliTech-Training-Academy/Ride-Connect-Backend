@@ -92,9 +92,14 @@ async function decide(
   decision: 'accept' | 'decline',
   driver: AuthedUser,
 ): Promise<void> {
-  const response = await request(app)
+  const patch = request(app)
     .patch(`/api/rides/${rideId}/requests/${requestId}/${decision}`)
     .set('Cookie', driver.cookie);
+
+  // Declining carries a reason the driver must supply; accepting takes no body.
+  const response = await (decision === 'decline'
+    ? patch.send({ reason: 'No room left on this trip, sorry.' })
+    : patch);
 
   expect(response.status).toBe(200);
 }
