@@ -3,6 +3,7 @@ import { and, asc, eq } from 'drizzle-orm';
 import { db, type Executor } from '../db';
 import { rideRequests, rides, users } from '../db/schema';
 import { CustomError } from '../lib/http/errors';
+import * as notifications from './notifications.service';
 
 const RIDE_NOT_FOUND = 'Ride not found.';
 const REQUEST_NOT_FOUND = 'Request not found.';
@@ -28,7 +29,14 @@ function hasDeparted(departureAt: Date): boolean {
 /** Submits a passenger's request to join an open Ride. */
 export async function createRequest(rideId: string, passengerId: string, exec: Executor = db) {
   const [ride] = await exec
-    .select({ id: rides.id, driverId: rides.driverId, status: rides.status, departureAt: rides.departureAt })
+    .select({
+      id: rides.id,
+      driverId: rides.driverId,
+      status: rides.status,
+      departureAt: rides.departureAt,
+      origin: rides.origin,
+      destination: rides.destination,
+    })
     .from(rides)
     .where(eq(rides.id, rideId));
 
@@ -63,6 +71,9 @@ export async function createRequest(rideId: string, passengerId: string, exec: E
       status: rideRequests.status,
       createdAt: rideRequests.createdAt,
     });
+
+  // `INSERT … RETURNING` yields exactly one row or throws, so the id is always there.
+  await notifications.notifyRequestReceived(ride, joinRequest!.id, passengerId, exec);
 
   return joinRequest;
 }
