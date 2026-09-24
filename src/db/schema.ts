@@ -8,7 +8,7 @@
  * better-auth stores the credential hash on the `account` row whose
  * `provider_id` is `'credential'`, never on the user record itself.
  */
-import { sql } from 'drizzle-orm';
+import { desc, sql } from 'drizzle-orm';
 import {
   boolean,
   check,
@@ -108,6 +108,58 @@ export const rideRequests = pgTable(
     unique('unique_ride_request').on(table.rideId, table.passengerId),
     index('idx_ride_requests_ride_id').on(table.rideId),
     index('idx_ride_requests_passenger_id').on(table.passengerId),
+  ],
+);
+
+/**
+ * What an in-app notification is about. Named from the recipient's point of view, not the
+ * actor's: `REQUEST_ACCEPTED` is read by the passenger whose request it was.
+ */
+export const notificationType = pgEnum('notification_type', [
+  'RIDE_REQUEST_RECEIVED',
+  'REQUEST_ACCEPTED',
+  'REQUEST_DECLINED',
+  'PASSENGER_WITHDREW',
+  'RIDE_CANCELLED',
+  'RIDE_UPDATED',
+]);
+
+/**
+ * A single in-app notification for one user.
+ *
+ * The route is *snapshotted* onto the row rather than joined from `rides` at read time.
+ * A notification is a historical record of something that happened, so it must keep saying
+ * "Accra → Kumasi" even if the driver later edits the ride, and it must stay readable once
+ * the ride is gone — which is why `ride_id` is `set null` on delete rather than `cascade`.
+ * The actor's *name* is deliberately not snapshotted; it is joined from `users`, so a
+ * rename is reflected everywhere the way the rest of the API already resolves names.
+ *
+ * `read_at` doubles as the read/unread flag: null means unread.
+ */
+export const notifications = pgTable(
+  'notifications',
+  {
+    id: uuid('id')
+      .primaryKey()
+      .default(sql`gen_random_uuid()`),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    type: notificationType('type').notNull(),
+    rideId: uuid('ride_id').references(() => rides.id, { onDelete: 'set null' }),
+    requestId: uuid('request_id').references(() => rideRequests.id, { onDelete: 'set null' }),
+    actorId: uuid('actor_id').references(() => users.id, { onDelete: 'set null' }),
+    rideOrigin: varchar('ride_origin', { length: 255 }),
+    rideDestination: varchar('ride_destination', { length: 255 }),
+    readAt: timestamp('read_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [
+    index('idx_notifications_user_id_created_at').on(table.userId, desc(table.createdAt)),
+    // Partial: the unread badge counts only ever scan the unread rows.
+    index('idx_notifications_user_id_unread')
+      .on(table.userId)
+      .where(sql`${table.readAt} IS NULL`),
   ],
 );
 
