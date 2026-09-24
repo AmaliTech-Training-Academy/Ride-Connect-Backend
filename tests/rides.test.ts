@@ -251,7 +251,8 @@ describe('GET /rides/mine — request visibility', () => {
 
     await request(app)
       .patch(`/api/rides/${ride.body.data.id}/requests/${joinRequest.body.data.id}/decline`)
-      .set('Cookie', driverCookie);
+      .set('Cookie', driverCookie)
+      .send({ reason: 'Car is already full.' });
 
     const declinedView = await request(app).get('/api/rides/mine').set('Cookie', passengerAuthCookie);
     expect(declinedView.body.data.joined).toHaveLength(1);

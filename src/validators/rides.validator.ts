@@ -128,6 +128,8 @@ export const joinedRideResponseSchema = rideResponseSchema.extend({
   requestId: z.uuid(),
   requestStatus: z.enum(requestStatus.enumValues),
   requestedAt: z.iso.datetime().nullable(),
+  rejectionReason: z.string().nullable(),
+  rerequestCount: z.number().int(),
 });
 
 /** The dashboard split: rides the caller drives and rides they've requested to join, each upcoming and past. */
