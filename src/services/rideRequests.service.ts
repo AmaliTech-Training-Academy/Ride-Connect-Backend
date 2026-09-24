@@ -19,6 +19,9 @@ const NOT_RIDE_OWNER_ACCEPT = 'Only the driver who owns this ride can accept its
 const NOT_RIDE_OWNER_DECLINE = 'Only the driver who owns this ride can decline its requests.';
 const NOT_REQUEST_OWNER = 'Only the passenger who made this request can withdraw it.';
 const REQUEST_ALREADY_INACTIVE = 'This request has already been declined or withdrawn.';
+const NOT_REQUEST_OWNER_REREQUEST = 'Only the passenger who made this request can request again.';
+const REQUEST_NOT_DECLINED = 'You can only request again after your request has been declined.';
+const REREQUEST_LIMIT_REACHED = 'You have already requested this ride again. The decline is final.';
 
 /** True once a Ride's departure time has passed. */
 function hasDeparted(departureAt: Date): boolean {
@@ -82,18 +85,26 @@ export async function listRideRequests(rideId: string, driverId: string, exec: E
     throw CustomError.forbidden(NOT_RIDE_OWNER_VIEW);
   }
 
-  return exec
+  const requests = await exec
     .select({
       id: rideRequests.id,
       passengerId: rideRequests.passengerId,
       passengerName: users.name,
       status: rideRequests.status,
+      rerequestCount: rideRequests.rerequestCount,
+      rejectionReason: rideRequests.rejectionReason,
+      rerequestReason: rideRequests.rerequestReason,
       createdAt: rideRequests.createdAt,
     })
     .from(rideRequests)
     .innerJoin(users, eq(rideRequests.passengerId, users.id))
     .where(and(eq(rideRequests.rideId, rideId), eq(rideRequests.status, 'PENDING')))
     .orderBy(asc(rideRequests.createdAt));
+
+  return requests.map(({ rerequestCount, ...request }) => ({
+    ...request,
+    isRerequest: rerequestCount > 0,
+  }));
 }
 
 /**
@@ -165,11 +176,15 @@ export async function acceptRequest(rideId: string, requestId: string, driverId:
   });
 }
 
-/** Declines a pending join request. Seat availability is unaffected. */
+/**
+ * Declines a pending join request with the driver's reason. Seat availability is unaffected.
+ * Declining a re-request stores the reason separately so the first one is kept, and is final.
+ */
 export async function declineRequest(
   rideId: string,
   requestId: string,
   driverId: string,
+  reason: string,
   exec: Executor = db,
 ) {
   const [ride] = await exec
@@ -186,7 +201,7 @@ export async function declineRequest(
   }
 
   const [joinRequest] = await exec
-    .select({ id: rideRequests.id, status: rideRequests.status })
+    .select({ id: rideRequests.id, status: rideRequests.status, rerequestCount: rideRequests.rerequestCount })
     .from(rideRequests)
     .where(and(eq(rideRequests.id, requestId), eq(rideRequests.rideId, rideId)));
 
@@ -198,9 +213,12 @@ export async function declineRequest(
     throw CustomError.conflict(REQUEST_ALREADY_DECIDED);
   }
 
+  const reasonField =
+    joinRequest.rerequestCount > 0 ? { finalRejectionReason: reason } : { rejectionReason: reason };
+
   const [declined] = await exec
     .update(rideRequests)
-    .set({ status: 'DECLINED' })
+    .set({ status: 'DECLINED', ...reasonField })
     .where(eq(rideRequests.id, requestId))
     .returning({
       id: rideRequests.id,
@@ -210,6 +228,73 @@ export async function declineRequest(
     });
 
   return declined;
+}
+
+/**
+ * Lets a passenger ask the driver to reconsider a declined request, once per ride.
+ * Reuses the same request row and puts it back to PENDING; no seat is taken until the driver accepts.
+ */
+export async function rerequestRequest(
+  rideId: string,
+  requestId: string,
+  passengerId: string,
+  reason: string,
+  exec: Executor = db,
+) {
+  const [ride] = await exec
+    .select({ id: rides.id, driverId: rides.driverId, status: rides.status, departureAt: rides.departureAt })
+    .from(rides)
+    .where(eq(rides.id, rideId));
+
+  if (!ride) {
+    throw CustomError.notFound(RIDE_NOT_FOUND);
+  }
+
+  const [joinRequest] = await exec
+    .select()
+    .from(rideRequests)
+    .where(and(eq(rideRequests.id, requestId), eq(rideRequests.rideId, rideId)));
+
+  if (!joinRequest) {
+    throw CustomError.notFound(REQUEST_NOT_FOUND);
+  }
+
+  if (joinRequest.passengerId !== passengerId) {
+    throw CustomError.forbidden(NOT_REQUEST_OWNER_REREQUEST);
+  }
+
+  if (ride.driverId === passengerId) {
+    throw CustomError.forbidden(CANNOT_JOIN_OWN_RIDE);
+  }
+
+  if (joinRequest.status !== 'DECLINED') {
+    throw CustomError.conflict(REQUEST_NOT_DECLINED);
+  }
+
+  if (joinRequest.rerequestCount >= 1) {
+    throw CustomError.conflict(REREQUEST_LIMIT_REACHED);
+  }
+
+  if (ride.status !== 'OPEN' || hasDeparted(ride.departureAt)) {
+    throw CustomError.conflict(RIDE_NOT_OPEN);
+  }
+
+  const [rerequested] = await exec
+    .update(rideRequests)
+    .set({
+      status: 'PENDING',
+      rerequestReason: reason,
+      rerequestCount: joinRequest.rerequestCount + 1,
+    })
+    .where(eq(rideRequests.id, requestId))
+    .returning({
+      id: rideRequests.id,
+      rideId: rideRequests.rideId,
+      passengerId: rideRequests.passengerId,
+      status: rideRequests.status,
+    });
+
+  return rerequested;
 }
 
 /**

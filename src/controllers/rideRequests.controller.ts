@@ -1,6 +1,6 @@
 import { authedController } from '../lib/http/controller';
 import * as rideRequestsService from '../services/rideRequests.service';
-import type { RequestIdParams, RideIdParams } from '../validators/rideRequests.validator';
+import type { ReasonBody, RequestIdParams, RideIdParams } from '../validators/rideRequests.validator';
 
 const REQUEST_SUBMITTED = 'Request submitted successfully';
 const NO_PENDING_REQUESTS = 'No pending requests for this ride.';
@@ -8,6 +8,7 @@ const REQUESTS_FETCHED = 'Requests fetched successfully';
 const REQUEST_ACCEPTED = 'Request accepted successfully';
 const REQUEST_DECLINED = 'Request declined successfully';
 const REQUEST_WITHDRAWN = 'Request withdrawn successfully';
+const REQUEST_SENT_AGAIN = 'Request sent again successfully';
 
 /** POST /api/rides/:rideId/requests — a passenger asks to join an open Ride. */
 export const createRequest = authedController<{ params: RideIdParams }>(async (req, res) => {
@@ -51,11 +52,12 @@ export const acceptRequest = authedController<{ params: RequestIdParams }>(async
 });
 
 /** PATCH /api/rides/:rideId/requests/:requestId/decline — the Driver declines a request. */
-export const declineRequest = authedController<{ params: RequestIdParams }>(async (req, res) => {
+export const declineRequest = authedController<{ params: RequestIdParams; body: ReasonBody }>(async (req, res) => {
   const request = await rideRequestsService.declineRequest(
     req.validated.params.rideId,
     req.validated.params.requestId,
     req.auth.user.id,
+    req.validated.body.reason,
   );
 
   res.customSuccess({
@@ -77,6 +79,24 @@ export const withdrawRequest = authedController<{ params: RequestIdParams }>(asy
 
   res.customSuccess({
     message: REQUEST_WITHDRAWN,
+    data: request,
+  });
+});
+
+/**
+ * PATCH /api/rides/:rideId/requests/:requestId/rerequest � the Passenger asks the Driver to
+ * reconsider a declined request. Allowed once per ride.
+ */
+export const rerequestRequest = authedController<{ params: RequestIdParams; body: ReasonBody }>(async (req, res) => {
+  const request = await rideRequestsService.rerequestRequest(
+    req.validated.params.rideId,
+    req.validated.params.requestId,
+    req.auth.user.id,
+    req.validated.body.reason,
+  );
+
+  res.customSuccess({
+    message: REQUEST_SENT_AGAIN,
     data: request,
   });
 });
