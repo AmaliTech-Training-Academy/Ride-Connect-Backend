@@ -71,6 +71,19 @@ export async function notifyRequestReceived(
   );
 }
 
+/** Tells a Ride's Driver that a Passenger has asked again for a seat they were refused. */
+export async function notifyRequestRerequested(
+  ride: RideContext,
+  requestId: string,
+  passengerId: string,
+  exec: Executor = db,
+): Promise<void> {
+  await insertNotifications(
+    [rideNotification('RIDE_REQUEST_REREQUESTED', ride, ride.driverId, requestId, passengerId)],
+    exec,
+  );
+}
+
 /** Tells a Passenger that the Driver accepted their request. */
 export async function notifyRequestAccepted(
   ride: RideContext,

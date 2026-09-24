@@ -121,6 +121,10 @@ export const rideRequests = pgTable(
  */
 export const notificationType = pgEnum('notification_type', [
   'RIDE_REQUEST_RECEIVED',
+  // A second ask on a request the driver already turned down. Kept distinct from the first
+  // ask above: a decline at this point is final, and the driver should be able to tell them
+  // apart without re-reading the request.
+  'RIDE_REQUEST_REREQUESTED',
   'REQUEST_ACCEPTED',
   'REQUEST_DECLINED',
   'PASSENGER_WITHDREW',

@@ -110,6 +110,19 @@ function withdraw(rideId: string, requestId: string, passenger: AuthedUser) {
     .set('Cookie', passenger.cookie);
 }
 
+/** Asks the driver to reconsider a declined request. Requires a reason, like declining. */
+function rerequest(
+  rideId: string,
+  requestId: string,
+  passenger: AuthedUser,
+  reason = 'Please reconsider — I really need this ride.',
+) {
+  return request(app)
+    .patch(`/api/rides/${rideId}/requests/${requestId}/rerequest`)
+    .set('Cookie', passenger.cookie)
+    .send({ reason });
+}
+
 function cancelRide(rideId: string, driver: AuthedUser) {
   return request(app).patch(`/api/rides/${rideId}/cancel`).set('Cookie', driver.cookie);
 }
@@ -211,6 +224,35 @@ describe('notifications created by ride activity', () => {
 
     await decide(ride.id, requestId, 'decline', driver);
 
+    expect(await typesFor(passenger)).toEqual(['REQUEST_DECLINED']);
+  });
+
+  it('tells the driver when a declined passenger asks again', async () => {
+    const driver = await registerUser('Grace Hopper');
+    const ride = await postRide(driver);
+    const passenger = await registerUser('Ada Lovelace');
+    const requestId = await joinRide(ride.id, passenger);
+    await decide(ride.id, requestId, 'decline', driver);
+
+    const response = await rerequest(ride.id, requestId, passenger);
+
+    expect(response.status).toBe(200);
+    const [newest] = await feedOf(driver);
+    expect(newest).toMatchObject({
+      // Not RIDE_REQUEST_RECEIVED: a second ask is a different event, carrying a different
+      // consequence (a decline now is final), and the driver has to be able to tell.
+      type: 'RIDE_REQUEST_REREQUESTED',
+      rideId: ride.id,
+      requestId,
+      actorId: passenger.userId,
+      actorName: 'Ada Lovelace',
+      rideOrigin: RIDE_ORIGIN,
+      rideDestination: RIDE_DESTINATION,
+      readAt: null,
+    });
+    // The original ask is still there; the re-ask arrives on top of it.
+    expect(await typesFor(driver)).toEqual(['RIDE_REQUEST_REREQUESTED', 'RIDE_REQUEST_RECEIVED']);
+    // Asking again is not news to the person doing the asking.
     expect(await typesFor(passenger)).toEqual(['REQUEST_DECLINED']);
   });
 

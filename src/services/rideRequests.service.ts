@@ -267,7 +267,15 @@ export async function rerequestRequest(
   exec: Executor = db,
 ) {
   const [ride] = await exec
-    .select({ id: rides.id, driverId: rides.driverId, status: rides.status, departureAt: rides.departureAt })
+    .select({
+      id: rides.id,
+      driverId: rides.driverId,
+      status: rides.status,
+      departureAt: rides.departureAt,
+      // Carried for the notification's route snapshot, not used in the checks below.
+      origin: rides.origin,
+      destination: rides.destination,
+    })
     .from(rides)
     .where(eq(rides.id, rideId));
 
@@ -318,6 +326,12 @@ export async function rerequestRequest(
       passengerId: rideRequests.passengerId,
       status: rideRequests.status,
     });
+
+  // The request is pending again and the driver has to decide on it afresh, so it is news to
+  // them in exactly the way the first ask was. Without this the driver is never told at all:
+  // there is no email or push, so the re-request would sit unseen until they happened to open
+  // the ride's request list.
+  await notifications.notifyRequestRerequested(ride, requestId, passengerId, exec);
 
   return rerequested;
 }
