@@ -15,6 +15,13 @@ export const requestIdParamsSchema = z.object({
 
 export type RequestIdParams = z.infer<typeof requestIdParamsSchema>;
 
+/** Body for declining a request or asking the driver to reconsider: a short reason is required. */
+export const reasonBodySchema = z.object({
+  reason: z.string().trim().min(1, 'A reason is required.').max(500, 'Reason must be 500 characters or fewer.'),
+});
+
+export type ReasonBody = z.infer<typeof reasonBodySchema>;
+
 export const rideRequestResponseSchema = z.object({
   id: z.uuid(),
   rideId: z.uuid(),
@@ -29,6 +36,9 @@ export const rideRequestSummarySchema = z.object({
   passengerId: z.uuid(),
   passengerName: z.string(),
   status: z.enum(requestStatus.enumValues),
+  isRerequest: z.boolean(),
+  rejectionReason: z.string().nullable(),
+  rerequestReason: z.string().nullable(),
   createdAt: z.iso.datetime().nullable(),
 });
 

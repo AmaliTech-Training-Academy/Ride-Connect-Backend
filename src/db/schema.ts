@@ -101,6 +101,10 @@ export const rideRequests = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
     status: requestStatus('status').notNull().default('PENDING'),
+    rejectionReason: varchar('rejection_reason', { length: 500 }),
+    rerequestReason: varchar('rerequest_reason', { length: 500 }),
+    rerequestCount: integer('rerequest_count').notNull().default(0),
+    finalRejectionReason: varchar('final_rejection_reason', { length: 500 }),
     createdAt: timestamp('created_at', { withTimezone: true }).default(sql`CURRENT_TIMESTAMP`),
     updatedAt: timestamp('updated_at', { withTimezone: true }).default(sql`CURRENT_TIMESTAMP`),
   },

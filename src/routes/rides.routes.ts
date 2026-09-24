@@ -6,6 +6,7 @@ import {
   createRequest,
   declineRequest,
   listRideRequests,
+  rerequestRequest,
   withdrawRequest,
 } from '../controllers/rideRequests.controller';
 import {
@@ -23,6 +24,7 @@ import {
 import { requireAuth } from '../middlewares/auth.middleware';
 import { documentedRoute } from '../middlewares/documentedRoute.middleware';
 import {
+  reasonBodySchema,
   requestIdParamsSchema,
   rideIdParamsSchema,
   rideRequestDecisionSchema,
@@ -221,12 +223,13 @@ ridesRouter.patch(
     method: 'patch',
     path: '/rides/:rideId/requests/:requestId/decline',
     tags: ['Ride requests'],
-    summary: 'Decline a request',
+    summary: 'Decline a request, with a reason',
     secured: true,
     params: requestIdParamsSchema,
+    body: reasonBodySchema,
     responses: {
       200: { description: 'Request declined', schema: successEnvelope(rideRequestDecisionSchema) },
-      400: invalidParams,
+      400: { description: 'Malformed id or missing reason', schema: validationErrorEnvelope },
       401: unauthorized,
       403: { description: 'Not the ride owner', schema: errorEnvelope },
       404: { description: 'No such ride or request', schema: errorEnvelope },
@@ -234,6 +237,29 @@ ridesRouter.patch(
     },
   }),
   declineRequest,
+);
+
+ridesRouter.patch(
+  '/:rideId/requests/:requestId/rerequest',
+  requireAuth,
+  documentedRoute({
+    method: 'patch',
+    path: '/rides/:rideId/requests/:requestId/rerequest',
+    tags: ['Ride requests'],
+    summary: 'Ask the driver to reconsider a declined request (once per ride)',
+    secured: true,
+    params: requestIdParamsSchema,
+    body: reasonBodySchema,
+    responses: {
+      200: { description: 'Request is pending again', schema: successEnvelope(rideRequestDecisionSchema) },
+      400: { description: 'Malformed id or missing reason', schema: validationErrorEnvelope },
+      401: unauthorized,
+      403: { description: 'Not your request', schema: errorEnvelope },
+      404: { description: 'No such ride or request', schema: errorEnvelope },
+      409: { description: 'Not declined, already re-requested, or ride no longer open', schema: errorEnvelope },
+    },
+  }),
+  rerequestRequest,
 );
 
 ridesRouter.patch(

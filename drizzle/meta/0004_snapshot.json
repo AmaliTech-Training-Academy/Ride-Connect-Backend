@@ -1,6 +1,6 @@
 {
-  "id": "791fe124-297d-45af-b809-f5118316a54b",
-  "prevId": "cfe4a4b6-0468-4420-85ff-50c40af20de6",
+  "id": "d86f7f0a-64b1-4b1f-82ad-60edb3f7941f",
+  "prevId": "791fe124-297d-45af-b809-f5118316a54b",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -128,6 +128,173 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
+    "public.notifications": {
+      "name": "notifications",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "type": {
+          "name": "type",
+          "type": "notification_type",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "ride_id": {
+          "name": "ride_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "request_id": {
+          "name": "request_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "actor_id": {
+          "name": "actor_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ride_origin": {
+          "name": "ride_origin",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ride_destination": {
+          "name": "ride_destination",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "read_at": {
+          "name": "read_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false,
+          "default": "CURRENT_TIMESTAMP"
+        }
+      },
+      "indexes": {
+        "idx_notifications_user_id_created_at": {
+          "name": "idx_notifications_user_id_created_at",
+          "columns": [
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "\"created_at\" desc",
+              "asc": true,
+              "isExpression": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "idx_notifications_user_id_unread": {
+          "name": "idx_notifications_user_id_unread",
+          "columns": [
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "where": "\"notifications\".\"read_at\" IS NULL",
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "notifications_user_id_users_id_fk": {
+          "name": "notifications_user_id_users_id_fk",
+          "tableFrom": "notifications",
+          "tableTo": "users",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "notifications_ride_id_rides_id_fk": {
+          "name": "notifications_ride_id_rides_id_fk",
+          "tableFrom": "notifications",
+          "tableTo": "rides",
+          "columnsFrom": [
+            "ride_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "notifications_request_id_ride_requests_id_fk": {
+          "name": "notifications_request_id_ride_requests_id_fk",
+          "tableFrom": "notifications",
+          "tableTo": "ride_requests",
+          "columnsFrom": [
+            "request_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        },
+        "notifications_actor_id_users_id_fk": {
+          "name": "notifications_actor_id_users_id_fk",
+          "tableFrom": "notifications",
+          "tableTo": "users",
+          "columnsFrom": [
+            "actor_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "set null",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
     "public.ride_requests": {
       "name": "ride_requests",
       "schema": "",
@@ -159,31 +326,6 @@
           "notNull": true,
           "default": "'PENDING'"
         },
-        "rejection_reason": {
-          "name": "rejection_reason",
-          "type": "varchar(500)",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "rerequest_reason": {
-          "name": "rerequest_reason",
-          "type": "varchar(500)",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "rerequest_count": {
-          "name": "rerequest_count",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        },
-        "final_rejection_reason": {
-          "name": "final_rejection_reason",
-          "type": "varchar(500)",
-          "primaryKey": false,
-          "notNull": false
-        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -197,6 +339,31 @@
           "primaryKey": false,
           "notNull": false,
           "default": "CURRENT_TIMESTAMP"
+        },
+        "final_rejection_reason": {
+          "name": "final_rejection_reason",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "varchar(500)"
+        },
+        "rejection_reason": {
+          "name": "rejection_reason",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "varchar(500)"
+        },
+        "rerequest_count": {
+          "default": 0,
+          "name": "rerequest_count",
+          "notNull": true,
+          "primaryKey": false,
+          "type": "integer"
+        },
+        "rerequest_reason": {
+          "name": "rerequest_reason",
+          "notNull": false,
+          "primaryKey": false,
+          "type": "varchar(500)"
         }
       },
       "indexes": {
@@ -669,6 +836,18 @@
     }
   },
   "enums": {
+    "public.notification_type": {
+      "name": "notification_type",
+      "schema": "public",
+      "values": [
+        "RIDE_REQUEST_RECEIVED",
+        "REQUEST_ACCEPTED",
+        "REQUEST_DECLINED",
+        "PASSENGER_WITHDREW",
+        "RIDE_CANCELLED",
+        "RIDE_UPDATED"
+      ]
+    },
     "public.request_status": {
       "name": "request_status",
       "schema": "public",

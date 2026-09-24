@@ -197,6 +197,8 @@ export async function listMyRides(userId: string, exec: Executor = db) {
       requestId: rideRequests.id,
       requestStatus: rideRequests.status,
       requestedAt: rideRequests.createdAt,
+      rejectionReason: rideRequests.rejectionReason,
+      rerequestCount: rideRequests.rerequestCount,
     })
     .from(rideRequests)
     .where(eq(rideRequests.passengerId, userId));
@@ -237,6 +239,8 @@ export async function listMyRides(userId: string, exec: Executor = db) {
       requestId: myRequest.requestId,
       requestStatus: myRequest.requestStatus,
       requestedAt: myRequest.requestedAt,
+      rejectionReason: myRequest.rejectionReason,
+      rerequestCount: myRequest.rerequestCount,
     };
   });
 
