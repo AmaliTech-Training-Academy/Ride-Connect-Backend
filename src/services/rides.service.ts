@@ -1,10 +1,14 @@
 import { and, asc, eq, gte, ilike, inArray, lt, or } from 'drizzle-orm';
 
 import { db, type Executor } from '../db';
-import { rideRequests, rides, users } from '../db/schema';
+import { requestStatus, rideRequests, rides, users } from '../db/schema';
 import { CustomError } from '../lib/http/errors';
 import { logger } from '../lib/logger';
 import type { CreateRideInput, ListRidesQuery, UpdateRideStatusInput } from '../validators/rides.validator';
+import * as notifications from './notifications.service';
+
+/** Any of the states a passenger's request to join a ride can be in. */
+type RequestStatus = (typeof requestStatus.enumValues)[number];
 
 const RIDE_NOT_FOUND = 'Ride not found.';
 const NOT_RIDE_OWNER_STATUS = 'Only the driver who owns this ride can change its status.';
@@ -248,10 +252,47 @@ export async function listMyRides(userId: string, exec: Executor = db) {
   };
 }
 
-/** Cancels a ride owned by the authenticated driver. */
+/** The ids of every passenger whose request on the ride is in any of the given states. */
+async function loadPassengerIds(
+  rideId: string,
+  statuses: RequestStatus[],
+  exec: Executor,
+): Promise<string[]> {
+  const rows = await exec
+    .select({ passengerId: rideRequests.passengerId })
+    .from(rideRequests)
+    .where(and(eq(rideRequests.rideId, rideId), inArray(rideRequests.status, statuses)));
+
+  return rows.map((row) => row.passengerId);
+}
+
+/**
+ * Tells everyone still waiting on a seat, or already holding one, that the Ride is off.
+ *
+ * Two endpoints can cancel a ride — `cancelRide`, and `updateRideStatus` with CANCELLED — so
+ * the fan-out lives here rather than in either one, which would leave the other path silent.
+ */
+async function notifyCancellation(ride: notifications.RideContext, exec: Executor): Promise<void> {
+  const passengerIds = await loadPassengerIds(ride.id, ['PENDING', 'ACCEPTED'], exec);
+
+  await notifications.notifyRideCancelled(ride, passengerIds, exec);
+}
+
+/**
+ * Cancels a ride owned by the authenticated driver.
+ *
+ * Everyone still waiting on a seat, or holding one, is told. Passengers whose requests were
+ * already declined or withdrawn are not: the ride ending is not news to them.
+ */
 export async function cancelRide(rideId: string, driverId: string, exec: Executor = db) {
   const [ride] = await exec
-    .select({ id: rides.id, driverId: rides.driverId, status: rides.status })
+    .select({
+      id: rides.id,
+      driverId: rides.driverId,
+      status: rides.status,
+      origin: rides.origin,
+      destination: rides.destination,
+    })
     .from(rides)
     .where(eq(rides.id, rideId));
 
@@ -283,6 +324,8 @@ export async function cancelRide(rideId: string, driverId: string, exec: Executo
       status: rides.status,
       createdAt: rides.createdAt,
     });
+
+  await notifyCancellation(ride, exec);
 
   return cancelled;
 }
@@ -340,6 +383,27 @@ export async function updateRideStatus(
       status: rides.status,
       availableSeats: rides.availableSeats,
     });
+
+  // A status change cannot move the route, so the row already loaded above is still current.
+  const rideContext = {
+    id: ride.id,
+    driverId: ride.driverId,
+    origin: ride.origin,
+    destination: ride.destination,
+  };
+
+  if (targetStatus === 'CANCELLED') {
+    // Same fan-out the dedicated cancel endpoint sends, so neither path can go silent.
+    await notifyCancellation(rideContext, exec);
+  } else {
+    // Closing or reopening the ride only concerns the passengers already holding a seat —
+    // those still waiting have no commitment to it yet.
+    await notifications.notifyRideUpdated(
+      rideContext,
+      await loadPassengerIds(rideId, ['ACCEPTED'], exec),
+      exec,
+    );
+  }
 
   return updated;
 }

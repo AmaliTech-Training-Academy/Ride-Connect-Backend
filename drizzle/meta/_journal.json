@@ -29,6 +29,20 @@
       "when": 1790236097318,
       "tag": "0003_rerequest_ride",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1790239471140,
+      "tag": "0004_strong_famine",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1790261455015,
+      "tag": "0005_long_forge",
+      "breakpoints": true
     }
   ]
 }

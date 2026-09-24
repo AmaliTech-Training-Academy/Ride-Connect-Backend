@@ -17,9 +17,10 @@ module.exports = tseslint.config(
     },
   },
   {
-    files: ['eslint.config.js', 'commitlint.config.js', 'jest.config.js', 'scripts/**/*.js'],
+    files: ['eslint.config.js', 'commitlint.config.js', 'jest.config.js', 'scripts/**/*.{js,mjs}'],
     languageOptions: {
       globals: {
+        URL: 'readonly',
         console: 'readonly',
         describe: 'readonly',
         expect: 'readonly',

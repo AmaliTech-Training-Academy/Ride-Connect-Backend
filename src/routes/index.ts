@@ -6,6 +6,7 @@ import { successEnvelope } from '../lib/http/envelope.schema';
 import { documentedRoute } from '../middlewares/documentedRoute.middleware';
 import { healthResponseSchema } from '../validators/health.validator';
 import { docsRouter } from './docs.routes';
+import { notificationsRouter } from './notifications.routes';
 import { ridesRouter } from './rides.routes';
 
 export const apiRouter = Router();
@@ -26,6 +27,7 @@ apiRouter.get(
 );
 
 apiRouter.use('/rides', ridesRouter);
+apiRouter.use('/notifications', notificationsRouter);
 
 if (env.DOCS_ENABLED) {
   apiRouter.use('/docs', docsRouter);

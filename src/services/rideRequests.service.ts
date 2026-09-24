@@ -3,6 +3,7 @@ import { and, asc, eq } from 'drizzle-orm';
 import { db, type Executor } from '../db';
 import { rideRequests, rides, users } from '../db/schema';
 import { CustomError } from '../lib/http/errors';
+import * as notifications from './notifications.service';
 
 const RIDE_NOT_FOUND = 'Ride not found.';
 const REQUEST_NOT_FOUND = 'Request not found.';
@@ -31,7 +32,14 @@ function hasDeparted(departureAt: Date): boolean {
 /** Submits a passenger's request to join an open Ride. */
 export async function createRequest(rideId: string, passengerId: string, exec: Executor = db) {
   const [ride] = await exec
-    .select({ id: rides.id, driverId: rides.driverId, status: rides.status, departureAt: rides.departureAt })
+    .select({
+      id: rides.id,
+      driverId: rides.driverId,
+      status: rides.status,
+      departureAt: rides.departureAt,
+      origin: rides.origin,
+      destination: rides.destination,
+    })
     .from(rides)
     .where(eq(rides.id, rideId));
 
@@ -66,6 +74,9 @@ export async function createRequest(rideId: string, passengerId: string, exec: E
       status: rideRequests.status,
       createdAt: rideRequests.createdAt,
     });
+
+  // `INSERT … RETURNING` yields exactly one row or throws, so the id is always there.
+  await notifications.notifyRequestReceived(ride, joinRequest!.id, passengerId, exec);
 
   return joinRequest;
 }
@@ -172,6 +183,8 @@ export async function acceptRequest(rideId: string, requestId: string, driverId:
         status: rideRequests.status,
       });
 
+    await notifications.notifyRequestAccepted(ride, requestId, joinRequest.passengerId, tx);
+
     return accepted;
   });
 }
@@ -188,7 +201,12 @@ export async function declineRequest(
   exec: Executor = db,
 ) {
   const [ride] = await exec
-    .select({ id: rides.id, driverId: rides.driverId })
+    .select({
+      id: rides.id,
+      driverId: rides.driverId,
+      origin: rides.origin,
+      destination: rides.destination,
+    })
     .from(rides)
     .where(eq(rides.id, rideId));
 
@@ -201,7 +219,12 @@ export async function declineRequest(
   }
 
   const [joinRequest] = await exec
-    .select({ id: rideRequests.id, status: rideRequests.status, rerequestCount: rideRequests.rerequestCount })
+    .select({
+      id: rideRequests.id,
+      passengerId: rideRequests.passengerId,
+      status: rideRequests.status,
+      rerequestCount: rideRequests.rerequestCount,
+    })
     .from(rideRequests)
     .where(and(eq(rideRequests.id, requestId), eq(rideRequests.rideId, rideId)));
 
@@ -227,6 +250,8 @@ export async function declineRequest(
       status: rideRequests.status,
     });
 
+  await notifications.notifyRequestDeclined(ride, requestId, joinRequest.passengerId, exec);
+
   return declined;
 }
 
@@ -242,7 +267,15 @@ export async function rerequestRequest(
   exec: Executor = db,
 ) {
   const [ride] = await exec
-    .select({ id: rides.id, driverId: rides.driverId, status: rides.status, departureAt: rides.departureAt })
+    .select({
+      id: rides.id,
+      driverId: rides.driverId,
+      status: rides.status,
+      departureAt: rides.departureAt,
+      // Carried for the notification's route snapshot, not used in the checks below.
+      origin: rides.origin,
+      destination: rides.destination,
+    })
     .from(rides)
     .where(eq(rides.id, rideId));
 
@@ -293,6 +326,12 @@ export async function rerequestRequest(
       passengerId: rideRequests.passengerId,
       status: rideRequests.status,
     });
+
+  // The request is pending again and the driver has to decide on it afresh, so it is news to
+  // them in exactly the way the first ask was. Without this the driver is never told at all:
+  // there is no email or push, so the re-request would sit unseen until they happened to open
+  // the ride's request list.
+  await notifications.notifyRequestRerequested(ride, requestId, passengerId, exec);
 
   return rerequested;
 }
@@ -348,6 +387,12 @@ export async function withdrawRequest(rideId: string, requestId: string, passeng
         passengerId: rideRequests.passengerId,
         status: rideRequests.status,
       });
+
+    // Giving up a confirmed seat is news to the driver and frees one, so it is worth telling
+    // them. A pending request quietly leaving the queue is neither, and does not notify.
+    if (joinRequest.status === 'ACCEPTED') {
+      await notifications.notifyPassengerWithdrew(ride, requestId, joinRequest.passengerId, tx);
+    }
 
     return withdrawn;
   });
