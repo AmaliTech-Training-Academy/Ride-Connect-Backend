@@ -183,6 +183,7 @@ export async function listNotifications(userId: string, filters: ListNotificatio
     // Left join, not inner: the actor's account may since have been deleted, and the
     // notification has to survive that. Its name simply comes back null.
     .leftJoin(users, eq(notifications.actorId, users.id))
+    .where(and(...conditions))
     // `id` breaks ties. A fan-out writes every row in one statement, and CURRENT_TIMESTAMP is
     // the transaction's start time, so those rows share a `created_at` to the microsecond.
     .orderBy(desc(notifications.createdAt), desc(notifications.id))
