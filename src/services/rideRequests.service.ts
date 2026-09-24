@@ -172,6 +172,8 @@ export async function acceptRequest(rideId: string, requestId: string, driverId:
         status: rideRequests.status,
       });
 
+    await notifications.notifyRequestAccepted(ride, requestId, joinRequest.passengerId, tx);
+
     return accepted;
   });
 }
@@ -184,7 +186,12 @@ export async function declineRequest(
   exec: Executor = db,
 ) {
   const [ride] = await exec
-    .select({ id: rides.id, driverId: rides.driverId })
+    .select({
+      id: rides.id,
+      driverId: rides.driverId,
+      origin: rides.origin,
+      destination: rides.destination,
+    })
     .from(rides)
     .where(eq(rides.id, rideId));
 
@@ -197,7 +204,7 @@ export async function declineRequest(
   }
 
   const [joinRequest] = await exec
-    .select({ id: rideRequests.id, status: rideRequests.status })
+    .select({ id: rideRequests.id, passengerId: rideRequests.passengerId, status: rideRequests.status })
     .from(rideRequests)
     .where(and(eq(rideRequests.id, requestId), eq(rideRequests.rideId, rideId)));
 
@@ -219,6 +226,8 @@ export async function declineRequest(
       passengerId: rideRequests.passengerId,
       status: rideRequests.status,
     });
+
+  await notifications.notifyRequestDeclined(ride, requestId, joinRequest.passengerId, exec);
 
   return declined;
 }
