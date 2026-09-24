@@ -284,6 +284,12 @@ export async function withdrawRequest(rideId: string, requestId: string, passeng
         status: rideRequests.status,
       });
 
+    // Giving up a confirmed seat is news to the driver and frees one, so it is worth telling
+    // them. A pending request quietly leaving the queue is neither, and does not notify.
+    if (joinRequest.status === 'ACCEPTED') {
+      await notifications.notifyPassengerWithdrew(ride, requestId, joinRequest.passengerId, tx);
+    }
+
     return withdrawn;
   });
 }
