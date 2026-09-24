@@ -1,5 +1,5 @@
 /**
- * In-app notification writes.
+ * In-app notifications: writing them as ride activity happens, and reading them back.
  *
  * Each `notify*` function is called from inside the service function that changes the state it
  * describes, and takes that caller's `exec` so the notification commits in the same transaction
@@ -8,8 +8,14 @@
  * They take already-loaded ride data rather than re-querying it: `acceptRequest` and
  * `withdrawRequest` are already holding their ride row under `FOR UPDATE` when they call in.
  */
+import { and, count, desc, eq, isNull } from 'drizzle-orm';
+
 import { db, type Executor } from '../db';
-import { notifications, notificationType } from '../db/schema';
+import { notifications, notificationType, users } from '../db/schema';
+import { CustomError } from '../lib/http/errors';
+import type { ListNotificationsQuery } from '../validators/notifications.validator';
+
+const NOTIFICATION_NOT_FOUND = 'Notification not found.';
 
 /** A notification's event, as named from the recipient's point of view. */
 export type NotificationType = (typeof notificationType.enumValues)[number];
@@ -150,4 +156,98 @@ export async function notifyRideUpdated(
     })),
     exec,
   );
+}
+
+/** The caller's feed, newest first, with the unread badge count alongside it. */
+export async function listNotifications(userId: string, filters: ListNotificationsQuery) {
+  const conditions = [eq(notifications.userId, userId)];
+
+  if (filters.unreadOnly) {
+    conditions.push(isNull(notifications.readAt));
+  }
+
+  const items = await db
+    .select({
+      id: notifications.id,
+      type: notifications.type,
+      rideId: notifications.rideId,
+      requestId: notifications.requestId,
+      rideOrigin: notifications.rideOrigin,
+      rideDestination: notifications.rideDestination,
+      actorId: notifications.actorId,
+      actorName: users.name,
+      readAt: notifications.readAt,
+      createdAt: notifications.createdAt,
+    })
+    .from(notifications)
+    // Left join, not inner: the actor's account may since have been deleted, and the
+    // notification has to survive that. Its name simply comes back null.
+    .leftJoin(users, eq(notifications.actorId, users.id))
+    // `id` breaks ties. A fan-out writes every row in one statement, and CURRENT_TIMESTAMP is
+    // the transaction's start time, so those rows share a `created_at` to the microsecond.
+    .orderBy(desc(notifications.createdAt), desc(notifications.id))
+    .limit(filters.limit)
+    .offset(filters.offset);
+
+  // Deliberately unfiltered: the badge reflects everything unread, not just this page.
+  return { items, unreadCount: await countUnread(userId) };
+}
+
+/** How many of the caller's notifications are still unread. */
+export async function countUnread(userId: string, exec: Executor = db): Promise<number> {
+  const [row] = await exec
+    .select({ unreadCount: count() })
+    .from(notifications)
+    .where(and(eq(notifications.userId, userId), isNull(notifications.readAt)));
+
+  return row?.unreadCount ?? 0;
+}
+
+/**
+ * Marks one of the caller's notifications read.
+ *
+ * Idempotent: the update is guarded on `read_at IS NULL`, so re-reading an already-read
+ * notification returns it untouched rather than erroring or pushing the timestamp forward.
+ * Someone else's notification is a 404, not a 403 — the caller has no business learning that
+ * the id exists at all.
+ */
+export async function markRead(notificationId: string, userId: string) {
+  const [marked] = await db
+    .update(notifications)
+    .set({ readAt: new Date() })
+    .where(
+      and(
+        eq(notifications.id, notificationId),
+        eq(notifications.userId, userId),
+        isNull(notifications.readAt),
+      ),
+    )
+    .returning({ id: notifications.id, readAt: notifications.readAt });
+
+  if (marked) {
+    return marked;
+  }
+
+  // Nothing was written: it is either already read, or it is not the caller's to read.
+  const [existing] = await db
+    .select({ id: notifications.id, readAt: notifications.readAt })
+    .from(notifications)
+    .where(and(eq(notifications.id, notificationId), eq(notifications.userId, userId)));
+
+  if (!existing) {
+    throw CustomError.notFound(NOTIFICATION_NOT_FOUND);
+  }
+
+  return existing;
+}
+
+/** Marks every unread notification the caller owns as read, reporting how many that was. */
+export async function markAllRead(userId: string): Promise<{ markedCount: number }> {
+  const marked = await db
+    .update(notifications)
+    .set({ readAt: new Date() })
+    .where(and(eq(notifications.userId, userId), isNull(notifications.readAt)))
+    .returning({ id: notifications.id });
+
+  return { markedCount: marked.length };
 }
