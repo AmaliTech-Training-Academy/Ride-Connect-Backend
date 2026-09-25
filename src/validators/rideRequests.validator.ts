@@ -35,6 +35,7 @@ export const rideRequestSummarySchema = z.object({
   id: z.uuid(),
   passengerId: z.uuid(),
   passengerName: z.string(),
+  passengerImage: z.string().nullable(),
   status: z.enum(requestStatus.enumValues),
   isRerequest: z.boolean(),
   rejectionReason: z.string().nullable(),

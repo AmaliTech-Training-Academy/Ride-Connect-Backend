@@ -101,6 +101,7 @@ export async function listRideRequests(rideId: string, driverId: string, exec: E
       id: rideRequests.id,
       passengerId: rideRequests.passengerId,
       passengerName: users.name,
+      passengerImage: users.image,
       status: rideRequests.status,
       rerequestCount: rideRequests.rerequestCount,
       rejectionReason: rideRequests.rejectionReason,
