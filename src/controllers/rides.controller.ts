@@ -12,7 +12,7 @@ export const createRide = authedController<{ body: CreateRideInput }>(async (req
   res.customSuccess({
     status: 201,
     message: 'Ride created successfully',
-    data: { ...ride, driverName: req.auth.user.name },
+    data: { ...ride, driverName: req.auth.user.name, driverImage: req.auth.user.image ?? null },
   });
 });
 

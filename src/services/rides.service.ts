@@ -78,6 +78,7 @@ export async function listRides(filters: ListRidesQuery, exec: Executor = db) {
       id: rides.id,
       driverId: rides.driverId,
       driverName: users.name,
+      driverImage: users.image,
       origin: rides.origin,
       destination: rides.destination,
       routeDescription: rides.routeDescription,
@@ -106,8 +107,8 @@ async function loadRequestSummaries(rideIds: string[], exec: Executor) {
   const summaries = new Map<
     string,
     {
-      pendingRequests: { id: string; passengerId: string; passengerName: string; createdAt: Date | null }[];
-      confirmedPassengers: { id: string; passengerId: string; passengerName: string }[];
+      pendingRequests: { id: string; passengerId: string; passengerName: string; passengerImage: string | null; createdAt: Date | null }[];
+      confirmedPassengers: { id: string; passengerId: string; passengerName: string; passengerImage: string | null }[];
     }
   >(rideIds.map((rideId) => [rideId, { pendingRequests: [], confirmedPassengers: [] }]));
 
@@ -121,6 +122,7 @@ async function loadRequestSummaries(rideIds: string[], exec: Executor) {
       id: rideRequests.id,
       passengerId: rideRequests.passengerId,
       passengerName: users.name,
+      passengerImage: users.image,
       status: rideRequests.status,
       createdAt: rideRequests.createdAt,
     })
@@ -140,6 +142,7 @@ async function loadRequestSummaries(rideIds: string[], exec: Executor) {
         id: request.id,
         passengerId: request.passengerId,
         passengerName: request.passengerName,
+        passengerImage: request.passengerImage,
         createdAt: request.createdAt,
       });
     } else {
@@ -147,6 +150,7 @@ async function loadRequestSummaries(rideIds: string[], exec: Executor) {
         id: request.id,
         passengerId: request.passengerId,
         passengerName: request.passengerName,
+        passengerImage: request.passengerImage,
       });
     }
   }
@@ -167,6 +171,7 @@ export async function listMyRides(userId: string, exec: Executor = db) {
       id: rides.id,
       driverId: rides.driverId,
       driverName: users.name,
+      driverImage: users.image,
       origin: rides.origin,
       destination: rides.destination,
       routeDescription: rides.routeDescription,
@@ -213,6 +218,7 @@ export async function listMyRides(userId: string, exec: Executor = db) {
             id: rides.id,
             driverId: rides.driverId,
             driverName: users.name,
+            driverImage: users.image,
             origin: rides.origin,
             destination: rides.destination,
             routeDescription: rides.routeDescription,

@@ -76,6 +76,7 @@ export const rideResponseSchema = z.object({
   id: z.uuid(),
   driverId: z.uuid(),
   driverName: z.string(),
+  driverImage: z.string().nullable(),
   origin: z.string(),
   destination: z.string(),
   routeDescription: z.string().nullable(),
@@ -107,6 +108,7 @@ export const pendingRequestSummarySchema = z.object({
   id: z.uuid(),
   passengerId: z.uuid(),
   passengerName: z.string(),
+  passengerImage: z.string().nullable(),
   createdAt: z.iso.datetime().nullable(),
 });
 
@@ -115,6 +117,7 @@ export const confirmedPassengerSchema = z.object({
   id: z.uuid(),
   passengerId: z.uuid(),
   passengerName: z.string(),
+  passengerImage: z.string().nullable(),
 });
 
 /** A ride the caller drives, with who's waiting on it and who's confirmed. */
@@ -140,5 +143,5 @@ export const myRidesResponseSchema = z.object({
   joinedPastAndCancelled: z.array(joinedRideResponseSchema),
 });
 
-/** A cancelled ride. The driver is the caller, so the row is returned without their name. */
-export const cancelledRideResponseSchema = rideResponseSchema.omit({ driverName: true });
+/** A cancelled ride. The driver is the caller, so the row is returned without their name or image. */
+export const cancelledRideResponseSchema = rideResponseSchema.omit({ driverName: true, driverImage: true });
