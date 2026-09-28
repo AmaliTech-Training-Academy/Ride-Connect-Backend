@@ -1,25 +1,45 @@
 name: CD
-# just Want to trigger the pipeline again
+
 on:
   push:
     branches:
-      - develop
-      - feat/t21-cd # running a test here so I do not have to wait for ci approval.
-# test comment to retrigger the workflow
+      - feat/t54-docker-compose
+
 jobs:
   ci:
-    uses: ./.github/workflows/ci.yml   # runs lint/test/build, must pass first
+    uses: ./.github/workflows/ci.yml
     secrets: inherit
   deploy:
     needs: ci
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/download-artifact@v4
+      - name: Set image tag
+        id: image
+        run: echo "tag=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
         with:
-          name: build-output
-          path: dist/
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push API image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          provenance: false
+          sbom: false
+          tags: ghcr.io/amalitech-training-academy/ride-connect-api:${{ steps.image.outputs.tag }}
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -31,40 +51,38 @@ jobs:
       - name: Ensure EC2 instance is running
         run: |
           STATE=$(aws ec2 describe-instances \
-            --instance-ids ${{ secrets.EC2_INSTANCE_ID }} \
+            --instance-ids ${{ secrets.DOCKER_EC2_INSTANCE_ID }} \
             --query 'Reservations[0].Instances[0].State.Name' \
             --output text)
           echo "Current state: $STATE"
           if [ "$STATE" != "running" ]; then
             echo "Instance is not running (Current: $STATE)." >&2
             exit 1
-            # aws ec2 start-instances --instance-ids ${{ secrets.EC2_INSTANCE_ID }}
-            # aws ec2 wait instance-running --instance-ids ${{ secrets.EC2_INSTANCE_ID }}
-            # sleep 15
-            # reason for those commits, is that I hope no code is merged into develop during off hours (TBD..yeah)
           fi
 
       - name: Load SSH key
         uses: webfactory/ssh-agent@v0.9.0
         with:
-          ssh-private-key: ${{ secrets.EC2_SSH_KEY }}
+          ssh-private-key: ${{ secrets.DOCKER_EC2_SSH_KEY }}
 
       - name: Add host to known_hosts
-        run: ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
+        run: ssh-keyscan -H ${{ secrets.DOCKER_EC2_HOST }} >> ~/.ssh/known_hosts
 
-      - name: Sync build to the server
+      - name: Sync stack files
         run: |
-          ssh ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} "mkdir -p /opt/app/backend/current"
-          rsync -avz ./dist ./drizzle ./package.json ./package-lock.json \
-            ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:/opt/app/backend/current/
- 
-      - name: Install prod deps, migrate, reload pm2
+          ssh ${{ secrets.DOCKER_EC2_USER }}@${{ secrets.DOCKER_EC2_HOST }} "mkdir -p /opt/ride-connect"
+          rsync -avz deploy/compose.yml deploy/Caddyfile \
+            ${{ secrets.DOCKER_EC2_USER }}@${{ secrets.DOCKER_EC2_HOST }}:/opt/ride-connect/
+
+      - name: Pull and start the stack
         run: |
-          ssh ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} '
+          ssh ${{ secrets.DOCKER_EC2_USER }}@${{ secrets.DOCKER_EC2_HOST }} "
             set -e
-            cd /opt/app/backend/current
-            npm ci 
-            npm run db:migrate:deploy
-            pm2 reload backend --update-env || pm2 start dist/server.js --name backend
-          '
- 
+            cd /opt/ride-connect
+            touch .env
+            grep -v '^API_TAG=' .env > .env.next || true
+            echo API_TAG=${{ steps.image.outputs.tag }} >> .env.next
+            mv .env.next .env
+            docker compose pull
+            docker compose up -d
+          "
