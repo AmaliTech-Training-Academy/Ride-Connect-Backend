@@ -84,7 +84,7 @@ export const withdrawRequest = authedController<{ params: RequestIdParams }>(asy
 });
 
 /**
- * PATCH /api/rides/:rideId/requests/:requestId/rerequest — the Passenger asks the Driver to
+ * PATCH /api/rides/:rideId/requests/:requestId/rerequest â€” the Passenger asks the Driver to
  * reconsider a declined request. Allowed once per ride.
  */
 export const rerequestRequest = authedController<{ params: RequestIdParams; body: ReasonBody }>(async (req, res) => {
