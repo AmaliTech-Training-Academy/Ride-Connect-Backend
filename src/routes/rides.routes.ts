@@ -14,6 +14,7 @@ import {
   createRide,
   listMyRides,
   listRides,
+  updateRide,
   updateRideStatus,
 } from '../controllers/rides.controller';
 import {
@@ -38,6 +39,7 @@ import {
   myRidesResponseSchema,
   rideResponseSchema,
   rideStatusResponseSchema,
+  updateRideSchema,
   updateRideStatusSchema,
 } from '../validators/rides.validator';
 
@@ -100,6 +102,31 @@ ridesRouter.post(
     },
   }),
   createRide,
+);
+ridesRouter.patch(
+  '/:rideId',
+  requireAuth,
+  documentedRoute({
+    method: 'patch',
+    path: '/rides/:rideId',
+    tags: ['Rides'],
+    summary: 'Edit the details of a ride you are driving',
+    secured: true,
+    params: rideIdParamsSchema,
+    body: updateRideSchema,
+    responses: {
+      200: { description: 'Ride updated', schema: successEnvelope(cancelledRideResponseSchema) },
+      400: { description: 'Invalid details, departure in the past, or malformed id', schema: validationErrorEnvelope },
+      401: unauthorized,
+      403: { description: 'Not the ride owner', schema: errorEnvelope },
+      404: { description: 'No such ride', schema: errorEnvelope },
+      409: {
+        description: 'Ride cancelled or completed, or seats below the accepted passengers',
+        schema: errorEnvelope,
+      },
+    },
+  }),
+  updateRide,
 );
 ridesRouter.patch(
   '/:rideId/cancel',

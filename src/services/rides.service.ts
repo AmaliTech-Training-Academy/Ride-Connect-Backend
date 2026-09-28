@@ -4,7 +4,13 @@ import { db, type Executor } from '../db';
 import { requestStatus, rideRequests, rides, users } from '../db/schema';
 import { CustomError } from '../lib/http/errors';
 import { logger } from '../lib/logger';
-import type { CreateRideInput, ListRidesQuery, UpdateRideStatusInput } from '../validators/rides.validator';
+import {
+  toDepartureInstant,
+  type CreateRideInput,
+  type ListRidesQuery,
+  type UpdateRideInput,
+  type UpdateRideStatusInput,
+} from '../validators/rides.validator';
 import * as notifications from './notifications.service';
 
 /** Any of the states a passenger's request to join a ride can be in. */
@@ -17,6 +23,11 @@ const RIDE_ALREADY_COMPLETED = 'This ride has already completed and cannot be ch
 const RIDE_CANNOT_REOPEN = 'This ride cannot be reopened because no seats are available.';
 const RIDE_STATUS_UNCHANGED = (status: string) => `This ride is already ${status}.`;
 const INVALID_STATUS_TRANSITION = 'This status change is not allowed.';
+const NOT_RIDE_OWNER_EDIT = 'Only the driver who owns this ride can edit it.';
+const SAME_ORIGIN_DESTINATION = 'Destination must be different from origin.';
+const DEPARTURE_IN_PAST = 'Departure date and time cannot be in the past.';
+const SEATS_BELOW_ACCEPTED = (taken: number) =>
+  `Total seats cannot be less than the ${taken} passenger(s) already accepted.`;
 const RIDE_COMPLETION_SWEEP_INTERVAL_MS = 60_000;
 
 /** True once a Ride's departure time has passed. */
@@ -412,6 +423,117 @@ export async function updateRideStatus(
   }
 
   return updated;
+}
+
+/**
+ * Edits a Ride's details on behalf of its Driver. Only the fields sent are changed.
+ *
+ * Locks the ride row, same as `acceptRequest`, so a passenger can't be accepted onto a seat
+ * while the total is being reduced. Seats already taken by accepted passengers are kept:
+ * `availableSeats` is recalculated from the new total, and a FULL ride that gains seats opens
+ * again. If the route or departure changed, accepted passengers get a RIDE_UPDATED
+ * notification so they can see the trip is not what they agreed to.
+ */
+export async function updateRide(rideId: string, driverId: string, input: UpdateRideInput) {
+  return db.transaction(async (tx) => {
+    const [ride] = await tx.select().from(rides).where(eq(rides.id, rideId)).for('update');
+
+    if (!ride) {
+      throw CustomError.notFound(RIDE_NOT_FOUND);
+    }
+
+    if (ride.driverId !== driverId) {
+      throw CustomError.forbidden(NOT_RIDE_OWNER_EDIT);
+    }
+
+    if (ride.status === 'CANCELLED') {
+      throw CustomError.conflict(RIDE_ALREADY_CANCELLED);
+    }
+
+    // A ride that has already left counts as completed, even before the sweep marks it.
+    if (ride.status === 'COMPLETED' || hasDeparted(ride.departureAt)) {
+      throw CustomError.conflict(RIDE_ALREADY_COMPLETED);
+    }
+
+    const origin = input.origin ?? ride.origin;
+    const destination = input.destination ?? ride.destination;
+
+    if (origin.toLowerCase() === destination.toLowerCase()) {
+      throw CustomError.badRequest(SAME_ORIGIN_DESTINATION);
+    }
+
+    // The ride stores one UTC instant, so fill in whichever half of it wasn't sent.
+    const currentDeparture = ride.departureAt.toISOString();
+    const departureAt = toDepartureInstant(
+      input.departureDate ?? currentDeparture.slice(0, 10),
+      input.departureTime ?? currentDeparture.slice(11, 19),
+    );
+
+    if (hasDeparted(departureAt)) {
+      throw CustomError.badRequest(DEPARTURE_IN_PAST);
+    }
+
+    // Every seat not available is held by an accepted passenger.
+    const takenSeats = ride.totalSeats - ride.availableSeats;
+    const totalSeats = input.totalSeats ?? ride.totalSeats;
+
+    if (totalSeats < takenSeats) {
+      throw CustomError.conflict(SEATS_BELOW_ACCEPTED(takenSeats));
+    }
+
+    const availableSeats = totalSeats - takenSeats;
+
+    // A ride the driver closed by hand stays closed unless the edit actually frees up seats.
+    let status = ride.status;
+    if (availableSeats === 0) {
+      status = 'FULL';
+    } else if (availableSeats > ride.availableSeats) {
+      status = 'OPEN';
+    }
+
+    const [updated] = await tx
+      .update(rides)
+      .set({
+        origin,
+        destination,
+        departureAt,
+        totalSeats,
+        availableSeats,
+        // Not sent keeps the old description; an empty string clears it.
+        routeDescription: input.routeDescription === undefined ? ride.routeDescription : input.routeDescription || null,
+        status,
+        updatedAt: new Date(),
+      })
+      .where(eq(rides.id, rideId))
+      .returning({
+        id: rides.id,
+        driverId: rides.driverId,
+        origin: rides.origin,
+        destination: rides.destination,
+        routeDescription: rides.routeDescription,
+        departureAt: rides.departureAt,
+        totalSeats: rides.totalSeats,
+        availableSeats: rides.availableSeats,
+        status: rides.status,
+        createdAt: rides.createdAt,
+      });
+
+    // Only route or time changes are worth telling passengers about, not seats.
+    const tripChanged =
+      origin !== ride.origin ||
+      destination !== ride.destination ||
+      departureAt.getTime() !== ride.departureAt.getTime();
+
+    if (tripChanged) {
+      await notifications.notifyRideUpdated(
+        { id: ride.id, driverId: ride.driverId, origin, destination },
+        await loadPassengerIds(rideId, ['ACCEPTED'], tx),
+        tx,
+      );
+    }
+
+    return updated;
+  });
 }
 
 /** Marks OPEN or FULL Rides whose departure time has passed as COMPLETED. */
