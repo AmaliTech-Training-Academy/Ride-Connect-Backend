@@ -30,10 +30,14 @@ function noRidesMessage(filters: ListRidesQuery): string {
     return 'No rides found for this route.';
   }
 
+  if (filters.office) {
+    return 'No rides found for this office.';
+  }
+
   return 'No rides found.';
 }
 
-/** GET /api/rides: browses open Rides, optionally filtered by day or route keyword. Requires authentication. */
+/** GET /api/rides: browses open Rides, optionally filtered by day, office, or keyword. Requires authentication. */
 export const listRides = authedController<{ query: ListRidesQuery }>(async (req, res) => {
   const rides = await ridesService.listRides(req.validated.query);
 

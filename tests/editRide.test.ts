@@ -44,6 +44,7 @@ async function postRide(driver: AuthedUser, overrides: Record<string, unknown> =
       departureDate: tomorrow(),
       departureTime: '17:00',
       availableSeats: 2,
+      office: 'KUMASI',
       ...overrides,
     });
 

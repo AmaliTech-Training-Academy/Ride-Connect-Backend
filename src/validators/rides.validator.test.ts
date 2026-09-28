@@ -21,6 +21,7 @@ function validRide(overrides: Record<string, unknown> = {}): Record<string, unkn
     departureDate: IN_THE_FUTURE,
     departureTime: '09:30',
     availableSeats: 3,
+    office: 'KUMASI',
     ...overrides,
   };
 }
@@ -51,6 +52,7 @@ describe('createRideSchema', () => {
       departureDate: ['Departure date is required.'],
       departureTime: ['Departure time is required.'],
       availableSeats: ['Available seats is required.'],
+      office: ['Office is required.'],
     });
   });
 

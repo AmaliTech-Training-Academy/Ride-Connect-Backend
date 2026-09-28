@@ -43,6 +43,7 @@ function validRide(): Record<string, unknown> {
     departureDate: date,
     departureTime: time,
     availableSeats: 3,
+    office: 'KUMASI',
   };
 }
 
