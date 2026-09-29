@@ -6,7 +6,6 @@ on:
       - main
       - develop
       - testing
-      - feat/t21-cd
 
   workflow_call:
 
