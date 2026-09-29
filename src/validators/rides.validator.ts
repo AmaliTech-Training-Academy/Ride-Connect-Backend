@@ -7,6 +7,32 @@ const MAX_SEATS = 8;
 
 const SEATS_OUT_OF_RANGE = `Available seats must be between ${MIN_SEATS} and ${MAX_SEATS}.`;
 const INVALID_OFFICE = 'Office must be one of KUMASI, ACCRA, or TAKORADI.';
+const MAX_WAYPOINTS = 8;
+
+const latitude = (label: string) =>
+  z
+    .number(`${label} must be a number.`)
+    .min(-90, `${label} must be between -90 and 90.`)
+    .max(90, `${label} must be between -90 and 90.`);
+
+const longitude = (label: string) =>
+  z
+    .number(`${label} must be a number.`)
+    .min(-180, `${label} must be between -180 and 180.`)
+    .max(180, `${label} must be between -180 and 180.`);
+
+const waypointSchema = z.object({
+  name: z.string('Waypoint name is required.').trim().min(1, 'Waypoint name is required.').max(255),
+  lat: latitude('Waypoint latitude'),
+  lng: longitude('Waypoint longitude'),
+  // A pin the driver dropped by hand has no Google place, so placeId can be null or left out.
+  placeId: z
+    .string('Waypoint placeId must be a string or null.')
+    .trim()
+    .min(1, 'Waypoint placeId cannot be empty.')
+    .nullable()
+    .default(null),
+});
 
 const requiredOr = (required: string, malformed: string) => (issue: { input: unknown }) =>
   issue.input === undefined || issue.input === '' ? required : malformed;
@@ -35,8 +61,47 @@ export const createRideSchema = z
       .min(MIN_SEATS, SEATS_OUT_OF_RANGE)
       .max(MAX_SEATS, SEATS_OUT_OF_RANGE),
     office: z.enum(office.enumValues, { error: requiredOr('Office is required.', INVALID_OFFICE) }),
+    originLat: latitude('Origin latitude').optional(),
+    originLng: longitude('Origin longitude').optional(),
+    destinationLat: latitude('Destination latitude').optional(),
+    destinationLng: longitude('Destination longitude').optional(),
+    waypoints: z
+      .array(waypointSchema, 'Waypoints must be a list.')
+      .max(MAX_WAYPOINTS, `A ride can have at most ${MAX_WAYPOINTS} waypoints.`)
+      .optional(),
+    routePolyline: z
+      .string('Route polyline must be a string.')
+      .trim()
+      .min(1, 'Route polyline cannot be empty.')
+      .optional(),
   })
   .superRefine((ride, ctx) => {
+    // The route is saved whole or not at all, so the map never gets half a route to draw.
+    const routeFields = [
+      ride.originLat,
+      ride.originLng,
+      ride.destinationLat,
+      ride.destinationLng,
+      ride.routePolyline,
+    ];
+    const sent = routeFields.filter((value) => value !== undefined).length;
+    if (sent !== 0 && sent !== routeFields.length) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['originLat'],
+        message: 'Send originLat, originLng, destinationLat, destinationLng and routePolyline together.',
+      });
+    }
+
+    // Stops only mean something on a route, so waypoints can't be sent without one.
+    if (sent === 0 && ride.waypoints && ride.waypoints.length > 0) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['waypoints'],
+        message: 'Waypoints can only be sent with the route (coordinates and routePolyline).',
+      });
+    }
+
     if (ride.origin.toLowerCase() === ride.destination.toLowerCase()) {
       ctx.addIssue({
         code: 'custom',
@@ -60,6 +125,12 @@ export const createRideSchema = z
     seatsOffered: ride.availableSeats,
     departureAt: toDepartureInstant(ride.departureDate, ride.departureTime),
     office: ride.office,
+    originLat: ride.originLat ?? null,
+    originLng: ride.originLng ?? null,
+    destinationLat: ride.destinationLat ?? null,
+    destinationLng: ride.destinationLng ?? null,
+    waypoints: ride.waypoints ?? [],
+    routePolyline: ride.routePolyline ?? null,
   }));
 
 export type CreateRideInput = z.infer<typeof createRideSchema>;
@@ -120,6 +191,12 @@ export const rideResponseSchema = z.object({
   availableSeats: z.number().int(),
   status: z.enum(rideStatus.enumValues),
   office: z.enum(office.enumValues),
+  originLat: z.number().nullable(),
+  originLng: z.number().nullable(),
+  destinationLat: z.number().nullable(),
+  destinationLng: z.number().nullable(),
+  waypoints: z.array(waypointSchema),
+  routePolyline: z.string().nullable(),
   createdAt: z.iso.datetime().nullable(),
 });
 

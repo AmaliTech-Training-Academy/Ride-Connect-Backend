@@ -12,8 +12,10 @@ import { desc, sql } from 'drizzle-orm';
 import {
   boolean,
   check,
+  doublePrecision,
   index,
   integer,
+  jsonb,
   pgEnum,
   pgTable,
   text,
@@ -28,6 +30,14 @@ export const rideStatus = pgEnum('ride_status', ['OPEN', 'FULL', 'CANCELLED', 'C
 
 /** The AmaliTech office a ride belongs to. Set per ride, not per user. */
 export const office = pgEnum('office', ['KUMASI', 'ACCRA', 'TAKORADI']);
+
+/** A stop the driver picked on the way, in the order they will pass it. */
+export interface RideWaypoint {
+  name: string;
+  lat: number;
+  lng: number;
+  placeId: string | null;
+}
 
 /** Lifecycle of a passenger's request to join a ride. */
 export const requestStatus = pgEnum('request_status', [
@@ -72,6 +82,13 @@ export const rides = pgTable(
     availableSeats: integer('available_seats').notNull(),
     status: rideStatus('status').notNull().default('OPEN'),
     office: office('office').notNull(),
+    // Map data from Google Maps. Rides posted before this was added have none of it.
+    originLat: doublePrecision('origin_lat'),
+    originLng: doublePrecision('origin_lng'),
+    destinationLat: doublePrecision('destination_lat'),
+    destinationLng: doublePrecision('destination_lng'),
+    waypoints: jsonb('waypoints').$type<RideWaypoint[]>().notNull().default([]),
+    routePolyline: text('route_polyline'),
     createdAt: timestamp('created_at', { withTimezone: true }).default(sql`CURRENT_TIMESTAMP`),
     updatedAt: timestamp('updated_at', { withTimezone: true }).default(sql`CURRENT_TIMESTAMP`),
   },

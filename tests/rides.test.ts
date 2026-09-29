@@ -47,6 +47,18 @@ function validRide(): Record<string, unknown> {
   };
 }
 
+const MAP_DATA = {
+  originLat: 5.6037,
+  originLng: -0.187,
+  destinationLat: 6.6885,
+  destinationLng: -1.6244,
+  waypoints: [
+    { name: 'Nkawkaw', lat: 6.5507, lng: -0.7667, placeId: 'place-nkawkaw' },
+    { name: 'Ejisu', lat: 6.7204, lng: -1.4717, placeId: 'place-ejisu' },
+  ],
+  routePolyline: 'a~l~Fjk~uOwHJy@P',
+};
+
 /** Creates a ride via the real POST /api/rides endpoint, as a fresh driver. Returns the created ride. */
 async function postRide(overrides: Record<string, unknown> = {}): Promise<{ id: string; driverId: string }> {
   const cookie = await registerDriver();
@@ -105,6 +117,46 @@ describe('POST /rides', () => {
 
     expect(response.status).toBe(201);
     expect(response.body.data.routeDescription).toBeNull();
+  });
+
+  it('saves the map pins, waypoints and route polyline, and returns them', async () => {
+    const cookie = await registerDriver();
+
+    const response = await request(app)
+      .post('/api/rides')
+      .set('Cookie', cookie)
+      .send({ ...validRide(), ...MAP_DATA });
+
+    expect(response.status).toBe(201);
+    expect(response.body.data).toMatchObject(MAP_DATA);
+  });
+
+  it('returns nulls and no waypoints for a ride posted without map data', async () => {
+    const cookie = await registerDriver();
+
+    const response = await request(app).post('/api/rides').set('Cookie', cookie).send(validRide());
+
+    expect(response.status).toBe(201);
+    expect(response.body.data).toMatchObject({
+      originLat: null,
+      originLng: null,
+      destinationLat: null,
+      destinationLng: null,
+      waypoints: [],
+      routePolyline: null,
+    });
+  });
+
+  it('rejects more than 8 waypoints', async () => {
+    const cookie = await registerDriver();
+    const waypoints = Array(9).fill(MAP_DATA.waypoints[0]);
+
+    const response = await request(app)
+      .post('/api/rides')
+      .set('Cookie', cookie)
+      .send({ ...validRide(), ...MAP_DATA, waypoints });
+
+    expect(response.status).toBe(400);
   });
 
   it('rejects an unauthenticated request', async () => {
@@ -208,6 +260,23 @@ describe('GET /rides/mine', () => {
     expect(myDriving.body.data.driving).toHaveLength(1);
     expect(myDriving.body.data.driving[0]).toMatchObject({ id: ownRide.body.data.id, status: 'OPEN' });
   });
+
+  it('includes the map data on the rides a user drives and has joined', async () => {
+    const driverCookie = await registerDriver();
+    const ride = await request(app)
+      .post('/api/rides')
+      .set('Cookie', driverCookie)
+      .send({ ...validRide(), ...MAP_DATA });
+
+    const passengerCookie = await registerUser('Ada Lovelace', 'passenger');
+    await request(app).post(`/api/rides/${ride.body.data.id}/requests`).set('Cookie', passengerCookie);
+
+    const asDriver = await request(app).get('/api/rides/mine').set('Cookie', driverCookie);
+    const asPassenger = await request(app).get('/api/rides/mine').set('Cookie', passengerCookie);
+
+    expect(asDriver.body.data.driving[0]).toMatchObject(MAP_DATA);
+    expect(asPassenger.body.data.joined[0]).toMatchObject(MAP_DATA);
+  });
 });
 
 describe('GET /rides/mine — request visibility', () => {
@@ -308,6 +377,16 @@ describe('GET /rides', () => {
 
     expect(response.status).toBe(200);
     expect(response.body.data[0].routeDescription).toBe('Meet at the Shell station, silver Corolla');
+  });
+
+  it('includes the map pins, waypoints and route polyline when the driver sent them', async () => {
+    await postRide(MAP_DATA);
+
+    const cookie = await registerDriver();
+    const response = await request(app).get('/api/rides').set('Cookie', cookie);
+
+    expect(response.status).toBe(200);
+    expect(response.body.data[0]).toMatchObject(MAP_DATA);
   });
 
   it('filters by departure date, returning only rides on that date', async () => {

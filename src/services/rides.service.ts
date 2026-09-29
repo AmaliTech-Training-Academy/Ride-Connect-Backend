@@ -48,6 +48,12 @@ export async function createRide(driverId: string, input: CreateRideInput, exec:
       totalSeats: input.seatsOffered,
       availableSeats: input.seatsOffered,
       office: input.office,
+      originLat: input.originLat,
+      originLng: input.originLng,
+      destinationLat: input.destinationLat,
+      destinationLng: input.destinationLng,
+      waypoints: input.waypoints,
+      routePolyline: input.routePolyline,
     })
     .returning({
       id: rides.id,
@@ -60,6 +66,12 @@ export async function createRide(driverId: string, input: CreateRideInput, exec:
       availableSeats: rides.availableSeats,
       status: rides.status,
       office: rides.office,
+      originLat: rides.originLat,
+      originLng: rides.originLng,
+      destinationLat: rides.destinationLat,
+      destinationLng: rides.destinationLng,
+      waypoints: rides.waypoints,
+      routePolyline: rides.routePolyline,
       createdAt: rides.createdAt,
     });
 
@@ -109,6 +121,12 @@ export async function listRides(filters: ListRidesQuery, exec: Executor = db) {
       availableSeats: rides.availableSeats,
       status: rides.status,
       office: rides.office,
+      originLat: rides.originLat,
+      originLng: rides.originLng,
+      destinationLat: rides.destinationLat,
+      destinationLng: rides.destinationLng,
+      waypoints: rides.waypoints,
+      routePolyline: rides.routePolyline,
       createdAt: rides.createdAt,
     })
     .from(rides)
@@ -203,6 +221,12 @@ export async function listMyRides(userId: string, exec: Executor = db) {
       availableSeats: rides.availableSeats,
       status: rides.status,
       office: rides.office,
+      originLat: rides.originLat,
+      originLng: rides.originLng,
+      destinationLat: rides.destinationLat,
+      destinationLng: rides.destinationLng,
+      waypoints: rides.waypoints,
+      routePolyline: rides.routePolyline,
       createdAt: rides.createdAt,
     })
     .from(rides)
@@ -251,6 +275,12 @@ export async function listMyRides(userId: string, exec: Executor = db) {
             availableSeats: rides.availableSeats,
             status: rides.status,
             office: rides.office,
+            originLat: rides.originLat,
+            originLng: rides.originLng,
+            destinationLat: rides.destinationLat,
+            destinationLng: rides.destinationLng,
+            waypoints: rides.waypoints,
+            routePolyline: rides.routePolyline,
             createdAt: rides.createdAt,
           })
           .from(rides)
@@ -354,6 +384,12 @@ export async function cancelRide(rideId: string, driverId: string, exec: Executo
       availableSeats: rides.availableSeats,
       status: rides.status,
       office: rides.office,
+      originLat: rides.originLat,
+      originLng: rides.originLng,
+      destinationLat: rides.destinationLat,
+      destinationLng: rides.destinationLng,
+      waypoints: rides.waypoints,
+      routePolyline: rides.routePolyline,
       createdAt: rides.createdAt,
     });
 
@@ -531,6 +567,12 @@ export async function updateRide(rideId: string, driverId: string, input: Update
         availableSeats: rides.availableSeats,
         status: rides.status,
         office: rides.office,
+        originLat: rides.originLat,
+        originLng: rides.originLng,
+        destinationLat: rides.destinationLat,
+        destinationLng: rides.destinationLng,
+        waypoints: rides.waypoints,
+        routePolyline: rides.routePolyline,
         createdAt: rides.createdAt,
       });
 
