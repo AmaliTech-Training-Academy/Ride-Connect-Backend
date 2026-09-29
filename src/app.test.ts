@@ -28,12 +28,20 @@ describe('malformed request bodies', () => {
 });
 
 describe('CORS', () => {
-  it('allows requests from any origin', async () => {
+  it('allows requests from a trusted origin', async () => {
     const response = await request(app)
       .get('/this-route-does-not-exist')
       .set('Origin', 'https://frontend.example.com');
 
     expect(response.headers['access-control-allow-origin']).toBe('https://frontend.example.com');
     expect(response.headers['access-control-allow-credentials']).toBe('true');
+  });
+
+  it('withholds CORS headers from an untrusted origin', async () => {
+    const response = await request(app)
+      .get('/this-route-does-not-exist')
+      .set('Origin', 'https://attacker.example.com');
+
+    expect(response.headers['access-control-allow-origin']).toBeUndefined();
   });
 });
