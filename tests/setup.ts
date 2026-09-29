@@ -27,6 +27,8 @@ if (testDatabaseUrl === process.env.DATABASE_URL) {
 process.env.DATABASE_URL = testDatabaseUrl;
 process.env.BETTER_AUTH_SECRET ??= 'test-secret-not-used-outside-tests';
 process.env.BETTER_AUTH_URL ??= 'http://localhost:3000';
+// Pinned rather than defaulted so the CORS assertions don't depend on a developer's .env.
+process.env.TRUSTED_ORIGINS = 'https://frontend.example.com';
 
 const testPool = new Pool({ connectionString: testDatabaseUrl });
 const testDb = drizzle(testPool);

@@ -18,7 +18,7 @@ export const auth = betterAuth({
   appName: 'RideConnect',
   secret: env.BETTER_AUTH_SECRET,
   baseURL: env.BETTER_AUTH_URL,
-  trustedOrigins: ['*'],
+  trustedOrigins: env.TRUSTED_ORIGINS,
 
   database: drizzleAdapter(db, {
     provider: 'pg',
