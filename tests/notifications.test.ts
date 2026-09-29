@@ -69,6 +69,7 @@ async function postRide(
       departureDate: date,
       departureTime: time,
       availableSeats: 3,
+      office: 'KUMASI',
       ...overrides,
     });
 

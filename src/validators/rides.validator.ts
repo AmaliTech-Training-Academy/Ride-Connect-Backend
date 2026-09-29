@@ -1,11 +1,12 @@
 import { z } from 'zod';
 
-import { requestStatus, rideStatus } from '../db/schema';
+import { office, requestStatus, rideStatus } from '../db/schema';
 
 const MIN_SEATS = 1;
 const MAX_SEATS = 8;
 
 const SEATS_OUT_OF_RANGE = `Available seats must be between ${MIN_SEATS} and ${MAX_SEATS}.`;
+const INVALID_OFFICE = 'Office must be one of KUMASI, ACCRA, or TAKORADI.';
 
 const requiredOr = (required: string, malformed: string) => (issue: { input: unknown }) =>
   issue.input === undefined || issue.input === '' ? required : malformed;
@@ -33,6 +34,7 @@ export const createRideSchema = z
       .int(SEATS_OUT_OF_RANGE)
       .min(MIN_SEATS, SEATS_OUT_OF_RANGE)
       .max(MAX_SEATS, SEATS_OUT_OF_RANGE),
+    office: z.enum(office.enumValues, { error: requiredOr('Office is required.', INVALID_OFFICE) }),
   })
   .superRefine((ride, ctx) => {
     if (ride.origin.toLowerCase() === ride.destination.toLowerCase()) {
@@ -57,6 +59,7 @@ export const createRideSchema = z
     routeDescription: ride.routeDescription,
     seatsOffered: ride.availableSeats,
     departureAt: toDepartureInstant(ride.departureDate, ride.departureTime),
+    office: ride.office,
   }));
 
 export type CreateRideInput = z.infer<typeof createRideSchema>;
@@ -99,6 +102,7 @@ export const listRidesSchema = z.object({
     .trim()
     .optional()
     .transform((value) => (value ? value : undefined)),
+  office: z.enum(office.enumValues, { error: INVALID_OFFICE }).optional(),
 });
 
 export type ListRidesQuery = z.infer<typeof listRidesSchema>;
@@ -115,6 +119,7 @@ export const rideResponseSchema = z.object({
   totalSeats: z.number().int(),
   availableSeats: z.number().int(),
   status: z.enum(rideStatus.enumValues),
+  office: z.enum(office.enumValues),
   createdAt: z.iso.datetime().nullable(),
 });
 

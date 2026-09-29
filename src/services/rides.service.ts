@@ -1,4 +1,4 @@
-import { and, asc, eq, gte, ilike, inArray, lt, or } from 'drizzle-orm';
+import { and, asc, eq, gte, ilike, inArray, lt, or, sql } from 'drizzle-orm';
 
 import { db, type Executor } from '../db';
 import { requestStatus, rideRequests, rides, users } from '../db/schema';
@@ -47,6 +47,7 @@ export async function createRide(driverId: string, input: CreateRideInput, exec:
       departureAt: input.departureAt,
       totalSeats: input.seatsOffered,
       availableSeats: input.seatsOffered,
+      office: input.office,
     })
     .returning({
       id: rides.id,
@@ -58,13 +59,14 @@ export async function createRide(driverId: string, input: CreateRideInput, exec:
       totalSeats: rides.totalSeats,
       availableSeats: rides.availableSeats,
       status: rides.status,
+      office: rides.office,
       createdAt: rides.createdAt,
     });
 
   return ride;
 }
 
-/** Lists open Rides, soonest departure first, optionally filtered by day or route keyword. */
+/** Lists open Rides, soonest departure first, optionally filtered by day, office, or keyword. */
 export async function listRides(filters: ListRidesQuery, exec: Executor = db) {
   const conditions = [eq(rides.status, 'OPEN'), gte(rides.departureAt, new Date())];
 
@@ -76,9 +78,18 @@ export async function listRides(filters: ListRidesQuery, exec: Executor = db) {
     conditions.push(gte(rides.departureAt, dayStart), lt(rides.departureAt, dayEnd));
   }
 
+  if (filters.office) {
+    conditions.push(eq(rides.office, filters.office));
+  }
+
   if (filters.search) {
     const keyword = `%${filters.search}%`;
-    const routeMatch = or(ilike(rides.origin, keyword), ilike(rides.destination, keyword));
+    // The office is an enum, so it is cast to text to be matched like the route.
+    const routeMatch = or(
+      ilike(rides.origin, keyword),
+      ilike(rides.destination, keyword),
+      ilike(sql`${rides.office}::text`, keyword),
+    );
     if (routeMatch) {
       conditions.push(routeMatch);
     }
@@ -97,6 +108,7 @@ export async function listRides(filters: ListRidesQuery, exec: Executor = db) {
       totalSeats: rides.totalSeats,
       availableSeats: rides.availableSeats,
       status: rides.status,
+      office: rides.office,
       createdAt: rides.createdAt,
     })
     .from(rides)
@@ -190,6 +202,7 @@ export async function listMyRides(userId: string, exec: Executor = db) {
       totalSeats: rides.totalSeats,
       availableSeats: rides.availableSeats,
       status: rides.status,
+      office: rides.office,
       createdAt: rides.createdAt,
     })
     .from(rides)
@@ -237,6 +250,7 @@ export async function listMyRides(userId: string, exec: Executor = db) {
             totalSeats: rides.totalSeats,
             availableSeats: rides.availableSeats,
             status: rides.status,
+            office: rides.office,
             createdAt: rides.createdAt,
           })
           .from(rides)
@@ -339,6 +353,7 @@ export async function cancelRide(rideId: string, driverId: string, exec: Executo
       totalSeats: rides.totalSeats,
       availableSeats: rides.availableSeats,
       status: rides.status,
+      office: rides.office,
       createdAt: rides.createdAt,
     });
 
@@ -515,6 +530,7 @@ export async function updateRide(rideId: string, driverId: string, input: Update
         totalSeats: rides.totalSeats,
         availableSeats: rides.availableSeats,
         status: rides.status,
+        office: rides.office,
         createdAt: rides.createdAt,
       });
 
