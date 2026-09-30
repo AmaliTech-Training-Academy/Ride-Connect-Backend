@@ -111,4 +111,64 @@ describe('createRideSchema', () => {
       'Route description must be 500 characters or fewer.',
     ]);
   });
+
+  it('keeps the map pins, waypoints and route polyline in the order they were sent', () => {
+    const waypoints = [
+      { name: 'Ejisu', lat: 6.72, lng: -1.47, placeId: 'place-ejisu' },
+      { name: 'Konongo', lat: 6.62, lng: -1.21, placeId: 'place-konongo' },
+    ];
+
+    const ride = createRideSchema.parse(
+      validRide({
+        originLat: 5.6,
+        originLng: -0.19,
+        destinationLat: 6.69,
+        destinationLng: -1.62,
+        waypoints,
+        routePolyline: 'a~l~Fjk~uOwHJy@P',
+      }),
+    );
+
+    expect(ride).toMatchObject({
+      originLat: 5.6,
+      originLng: -0.19,
+      destinationLat: 6.69,
+      destinationLng: -1.62,
+      waypoints,
+      routePolyline: 'a~l~Fjk~uOwHJy@P',
+    });
+  });
+
+  it('stores nulls and no waypoints when no map data is sent', () => {
+    expect(createRideSchema.parse(validRide())).toMatchObject({
+      originLat: null,
+      originLng: null,
+      destinationLat: null,
+      destinationLng: null,
+      waypoints: [],
+      routePolyline: null,
+    });
+  });
+
+  it('asks for the whole route when only part of it is sent', () => {
+    expect(fieldErrors(validRide({ originLat: 5.6, originLng: -0.19 })).originLat).toEqual([
+      'Send originLat, originLng, destinationLat, destinationLng and routePolyline together.',
+    ]);
+  });
+
+  it('rejects a coordinate that is off the map', () => {
+    expect(fieldErrors(validRide({ originLat: 91, originLng: 0, destinationLat: 0, destinationLng: 1, routePolyline: 'abc' })).originLat).toEqual([
+      'Origin latitude must be between -90 and 90.',
+    ]);
+  });
+
+  it('allows at most 8 waypoints', () => {
+    const waypoint = { name: 'Stop', lat: 6, lng: -1, placeId: 'place-stop' };
+
+    const route = { originLat: 5.6, originLng: -0.19, destinationLat: 6.69, destinationLng: -1.62, routePolyline: 'abc' };
+
+    expect(fieldErrors(validRide({ ...route, waypoints: Array(9).fill(waypoint) })).waypoints).toEqual([
+      'A ride can have at most 8 waypoints.',
+    ]);
+  });
 });

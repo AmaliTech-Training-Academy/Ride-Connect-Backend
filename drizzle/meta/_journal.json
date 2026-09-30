@@ -50,6 +50,13 @@
       "when": 1790612847305,
       "tag": "0006_ride_office",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1790677063950,
+      "tag": "0007_ride_map_route",
+      "breakpoints": true
     }
   ]
 }
