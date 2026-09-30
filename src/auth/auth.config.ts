@@ -22,6 +22,28 @@ export const EMAIL_DOMAIN_NOT_ALLOWED_CODE = 'EMAIL_DOMAIN_NOT_ALLOWED';
 
 export const EMAIL_DOMAIN_NOT_ALLOWED_MESSAGE = `Registration is restricted to ${ALLOWED_EMAIL_DOMAINS.map((domain) => `@${domain}`).join(' or ')} email addresses.`;
 
+export const NAME_REQUIRED_CODE = 'NAME_REQUIRED';
+
+export const NAME_REQUIRED_MESSAGE = 'Name is required';
+
+/**
+ * Whether a submitted name carries any content once surrounding whitespace is
+ * ignored. The stored name is left exactly as it arrived — only this test trims.
+ *
+ * @param name Name as submitted, of any type.
+ * @returns `true` when the name is a string holding a non-whitespace character.
+ */
+export function isUsableName(name: unknown): boolean {
+  return typeof name === 'string' && name.trim().length > 0;
+}
+
+export function nameRequiredError(): APIError {
+  return APIError.from('BAD_REQUEST', {
+    code: NAME_REQUIRED_CODE,
+    message: NAME_REQUIRED_MESSAGE,
+  });
+}
+
 /**
  * The domain of an address, lowercased and trimmed, or `null` when the input is not a
  * usable address.
@@ -94,6 +116,12 @@ export const auth = betterAuth({
     user: {
       create: {
         before: async (user) => {
+          if (!isUsableName(user.name)) {
+            logger.warn(`[auth] Rejected sign-up for "${user.email}": ${NAME_REQUIRED_MESSAGE}`);
+
+            throw nameRequiredError();
+          }
+
           if (isAllowedEmailDomain(user.email)) return;
 
           logger.warn(
