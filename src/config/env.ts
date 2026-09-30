@@ -15,6 +15,16 @@ export const envSchema = z.object({
   // Off switch for /api/docs: the reference exposes every route and a live
   // request console, which a locked-down deployment may not want reachable.
   DOCS_ENABLED: z.stringbool().default(true),
+  ALLOWED_EMAIL_DOMAINS: z
+    .string()
+    .min(1)
+    .default('amalitech.com,amalitechtraining.org')
+    .transform((domains) =>
+      domains
+        .split(',')
+        .map((domain) => domain.trim().toLowerCase())
+        .filter(Boolean)
+    ),
   TRUSTED_ORIGINS: z
     .string()
     .default('')
