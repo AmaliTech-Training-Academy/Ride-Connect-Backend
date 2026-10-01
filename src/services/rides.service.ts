@@ -323,6 +323,7 @@ export async function cancelRide(rideId: string, driverId: string, exec: Executo
       status: rides.status,
       origin: rides.origin,
       destination: rides.destination,
+      departureAt: rides.departureAt,
     })
     .from(rides)
     .where(eq(rides.id, rideId));
@@ -337,6 +338,15 @@ export async function cancelRide(rideId: string, driverId: string, exec: Executo
 
   if (ride.status === 'CANCELLED') {
     throw CustomError.conflict('This ride has already been cancelled.');
+  }
+
+  // Same guard as updateRideStatus, so both cancel paths agree.
+  const alreadyCompleted =
+    ride.status === 'COMPLETED' ||
+    ((ride.status === 'OPEN' || ride.status === 'FULL') && hasDeparted(ride.departureAt));
+
+  if (alreadyCompleted) {
+    throw CustomError.conflict(RIDE_ALREADY_COMPLETED);
   }
 
   const [cancelled] = await exec

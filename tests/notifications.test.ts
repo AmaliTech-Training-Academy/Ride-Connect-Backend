@@ -1,7 +1,10 @@
+import { eq } from 'drizzle-orm';
 import request from 'supertest';
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 
 import { createApp } from '../src/app';
+import { db } from '../src/db';
+import { rides } from '../src/db/schema';
 import { closeDb, resetAuthTables, uniqueEmail } from './helpers';
 
 const app = createApp();
@@ -303,6 +306,36 @@ describe('notifications created by ride activity', () => {
     expect(await typesFor(declined)).not.toContain('RIDE_CANCELLED');
     // Nor does the driver need telling about their own action.
     expect(await typesFor(driver)).not.toContain('RIDE_CANCELLED');
+  });
+
+  it('does not cancel a completed ride or notify its passengers', async () => {
+    const driver = await registerUser('Grace Hopper');
+    const ride = await postRide(driver);
+    const passenger = await registerUser('Ada Lovelace');
+    await joinRide(ride.id, passenger);
+    await db.update(rides).set({ status: 'COMPLETED' }).where(eq(rides.id, ride.id));
+
+    const response = await cancelRide(ride.id, driver);
+
+    expect(response.status).toBe(409);
+    expect(await typesFor(passenger)).not.toContain('RIDE_CANCELLED');
+  });
+
+  it('does not cancel a ride that has already departed', async () => {
+    const driver = await registerUser('Grace Hopper');
+    const ride = await postRide(driver);
+    const passenger = await registerUser('Ada Lovelace');
+    await joinRide(ride.id, passenger);
+    // Still OPEN, but the departure time has passed.
+    await db
+      .update(rides)
+      .set({ departureAt: new Date(Date.now() - 60 * 60 * 1000) })
+      .where(eq(rides.id, ride.id));
+
+    const response = await cancelRide(ride.id, driver);
+
+    expect(response.status).toBe(409);
+    expect(await typesFor(passenger)).not.toContain('RIDE_CANCELLED');
   });
 
   it('sends the same cancellation from the status endpoint', async () => {
