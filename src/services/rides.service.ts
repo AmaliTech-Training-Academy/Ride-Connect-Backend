@@ -66,7 +66,7 @@ export async function createRide(driverId: string, input: CreateRideInput, exec:
   return ride;
 }
 
-/** Lists open Rides, soonest departure first, optionally filtered by day, office, or keyword. */
+/** Lists open Rides, soonest departure first, optionally filtered by day, office, or keyword. One page at a time. */
 export async function listRides(filters: ListRidesQuery, exec: Executor = db) {
   const conditions = [eq(rides.status, 'OPEN'), gte(rides.departureAt, new Date())];
 
@@ -114,7 +114,10 @@ export async function listRides(filters: ListRidesQuery, exec: Executor = db) {
     .from(rides)
     .innerJoin(users, eq(rides.driverId, users.id))
     .where(and(...conditions))
-    .orderBy(asc(rides.departureAt));
+    // `id` breaks ties so rides leaving at the same time keep a stable order across pages.
+    .orderBy(asc(rides.departureAt), asc(rides.id))
+    .limit(filters.limit)
+    .offset(filters.offset);
 }
 
 /** True once a Ride has been cancelled or has run its course. */

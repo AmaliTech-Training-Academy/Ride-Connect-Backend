@@ -1,0 +1,1 @@
+CREATE INDEX "idx_rides_status_departure_at" ON "rides" USING btree ("status","departure_at");
