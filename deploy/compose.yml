@@ -15,6 +15,12 @@ services:
     networks:
       - edge
 
+  frontend:
+    image: ghcr.io/amalitech-training-academy/ride-connect-frontend:${FRONTEND_TAG}
+    restart: unless-stopped
+    networks:
+      - edge
+
   api:
     image: ghcr.io/amalitech-training-academy/ride-connect-api:${API_TAG}
     restart: unless-stopped

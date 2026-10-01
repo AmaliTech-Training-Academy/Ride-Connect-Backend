@@ -74,15 +74,25 @@ jobs:
           rsync -avz deploy/compose.yml deploy/Caddyfile \
             ${{ secrets.DOCKER_EC2_USER }}@${{ secrets.DOCKER_EC2_HOST }}:/opt/ride-connect/
 
+      - name: Log the host in to GHCR
+        env:
+          TARGET: ${{ secrets.DOCKER_EC2_USER }}@${{ secrets.DOCKER_EC2_HOST }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "$GITHUB_TOKEN" | ssh "$TARGET" \
+            docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+
       - name: Pull and start the stack
         run: |
           ssh ${{ secrets.DOCKER_EC2_USER }}@${{ secrets.DOCKER_EC2_HOST }} "
             set -e
             cd /opt/ride-connect
             touch .env
-            grep -v '^API_TAG=' .env > .env.next || true
-            echo API_TAG=${{ steps.image.outputs.tag }} >> .env.next
-            mv .env.next .env
+            TMP=\$(mktemp)
+            grep -v '^API_TAG=' .env > \"\$TMP\" || [ \$? -eq 1 ]
+            echo API_TAG=${{ steps.image.outputs.tag }} >> \"\$TMP\"
+            cat \"\$TMP\" > .env
+            rm \"\$TMP\"
             docker compose pull
             docker compose up -d
           "
