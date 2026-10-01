@@ -211,6 +211,7 @@ export async function declineRequest(rideId: string, requestId: string, driverId
       .select({
         id: rides.id,
         driverId: rides.driverId,
+        status: rides.status,
         origin: rides.origin,
         destination: rides.destination,
       })
@@ -224,6 +225,10 @@ export async function declineRequest(rideId: string, requestId: string, driverId
 
     if (ride.driverId !== driverId) {
       throw CustomError.forbidden(NOT_RIDE_OWNER_DECLINE);
+    }
+
+    if (ride.status === 'CANCELLED') {
+      throw CustomError.conflict(RIDE_CANCELLED);
     }
 
     const [joinRequest] = await tx
@@ -314,6 +319,10 @@ export async function rerequestRequest(rideId: string, requestId: string, passen
       throw CustomError.forbidden(CANNOT_JOIN_OWN_RIDE);
     }
 
+    if (ride.status === 'CANCELLED') {
+      throw CustomError.conflict(RIDE_CANCELLED);
+    }
+
     if (joinRequest.status !== 'DECLINED') {
       throw CustomError.conflict(REQUEST_NOT_DECLINED);
     }
@@ -381,6 +390,10 @@ export async function withdrawRequest(rideId: string, requestId: string, passeng
 
     if (joinRequest.passengerId !== passengerId) {
       throw CustomError.forbidden(NOT_REQUEST_OWNER);
+    }
+
+    if (ride.status === 'CANCELLED') {
+      throw CustomError.conflict(RIDE_CANCELLED);
     }
 
     if (joinRequest.status === 'DECLINED' || joinRequest.status === 'WITHDRAWN') {
