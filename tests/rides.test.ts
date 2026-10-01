@@ -337,6 +337,31 @@ describe('GET /rides', () => {
     expect(response.body.data).toHaveLength(2);
   });
 
+  it('treats % in the search keyword as a literal character', async () => {
+    await postRide({ origin: 'Accra', destination: 'Kumasi' });
+    await postRide({ origin: 'Gate 100% Mall', destination: 'Tema' });
+
+    const cookie = await registerDriver();
+    const response = await request(app).get('/api/rides').set('Cookie', cookie).query({ search: '%' });
+
+    expect(response.status).toBe(200);
+    expect(response.body.data).toHaveLength(1);
+    expect(response.body.data[0].origin).toBe('Gate 100% Mall');
+  });
+
+  it('treats _ and \\ in the search keyword as literal characters', async () => {
+    await postRide({ origin: 'Accra', destination: 'Kumasi' });
+    await postRide({ origin: 'Site_B', destination: 'Tema' });
+    await postRide({ origin: 'Block\\C', destination: 'Ho' });
+
+    const cookie = await registerDriver();
+    const underscore = await request(app).get('/api/rides').set('Cookie', cookie).query({ search: '_' });
+    const backslash = await request(app).get('/api/rides').set('Cookie', cookie).query({ search: '\\' });
+
+    expect(underscore.body.data.map((ride: { origin: string }) => ride.origin)).toEqual(['Site_B']);
+    expect(backslash.body.data.map((ride: { origin: string }) => ride.origin)).toEqual(['Block\\C']);
+  });
+
   it('returns a friendly message when nothing matches the date filter', async () => {
     await postRide();
 
@@ -366,5 +391,42 @@ describe('GET /rides', () => {
 
     expect(response.status).toBe(400);
     expect(response.body.data.fields.date[0]).toMatch(/invalid date/i);
+  });
+
+  it('returns one page at a time, soonest departure first', async () => {
+    const third = daysFromNow(3);
+    const first = daysFromNow(1);
+    const second = daysFromNow(2);
+    await postRide({ origin: 'Ho', departureDate: third.date, departureTime: third.time });
+    await postRide({ origin: 'Accra', departureDate: first.date, departureTime: first.time });
+    await postRide({ origin: 'Tema', departureDate: second.date, departureTime: second.time });
+
+    const cookie = await registerDriver();
+    const firstPage = await request(app).get('/api/rides').set('Cookie', cookie).query({ limit: 2 });
+    const secondPage = await request(app)
+      .get('/api/rides')
+      .set('Cookie', cookie)
+      .query({ limit: 2, offset: 2 });
+
+    expect(firstPage.status).toBe(200);
+    expect(firstPage.body.data.map((ride: { origin: string }) => ride.origin)).toEqual(['Accra', 'Tema']);
+    expect(secondPage.status).toBe(200);
+    expect(secondPage.body.data.map((ride: { origin: string }) => ride.origin)).toEqual(['Ho']);
+  });
+
+  it('rejects a limit above 50', async () => {
+    const cookie = await registerDriver();
+    const response = await request(app).get('/api/rides').set('Cookie', cookie).query({ limit: 51 });
+
+    expect(response.status).toBe(400);
+    expect(response.body.data.fields.limit[0]).toMatch(/50 or fewer/);
+  });
+
+  it('rejects a negative offset', async () => {
+    const cookie = await registerDriver();
+    const response = await request(app).get('/api/rides').set('Cookie', cookie).query({ offset: -1 });
+
+    expect(response.status).toBe(400);
+    expect(response.body.data.fields.offset[0]).toMatch(/cannot be negative/);
   });
 });

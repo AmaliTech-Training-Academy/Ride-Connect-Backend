@@ -66,7 +66,7 @@ export async function createRide(driverId: string, input: CreateRideInput, exec:
   return ride;
 }
 
-/** Lists open Rides, soonest departure first, optionally filtered by day, office, or keyword. */
+/** Lists open Rides, soonest departure first, optionally filtered by day, office, or keyword. One page at a time. */
 export async function listRides(filters: ListRidesQuery, exec: Executor = db) {
   const conditions = [eq(rides.status, 'OPEN'), gte(rides.departureAt, new Date())];
 
@@ -83,7 +83,9 @@ export async function listRides(filters: ListRidesQuery, exec: Executor = db) {
   }
 
   if (filters.search) {
-    const keyword = `%${filters.search}%`;
+    // Escape ILIKE's wildcards so a typed `%` or `_` matches itself. `\` goes first, as it is the escape character.
+    const escaped = filters.search.replace(/[\\%_]/g, (char) => `\\${char}`);
+    const keyword = `%${escaped}%`;
     // The office is an enum, so it is cast to text to be matched like the route.
     const routeMatch = or(
       ilike(rides.origin, keyword),
@@ -114,7 +116,10 @@ export async function listRides(filters: ListRidesQuery, exec: Executor = db) {
     .from(rides)
     .innerJoin(users, eq(rides.driverId, users.id))
     .where(and(...conditions))
-    .orderBy(asc(rides.departureAt));
+    // `id` breaks ties so rides leaving at the same time keep a stable order across pages.
+    .orderBy(asc(rides.departureAt), asc(rides.id))
+    .limit(filters.limit)
+    .offset(filters.offset);
 }
 
 /** True once a Ride has been cancelled or has run its course. */
@@ -314,130 +319,152 @@ async function notifyCancellation(ride: notifications.RideContext, exec: Executo
  *
  * Everyone still waiting on a seat, or holding one, is told. Passengers whose requests were
  * already declined or withdrawn are not: the ride ending is not news to them.
+ *
+ * Runs in one transaction with the ride row locked, so the status change and the
+ * notifications either all commit or all roll back.
  */
-export async function cancelRide(rideId: string, driverId: string, exec: Executor = db) {
-  const [ride] = await exec
-    .select({
-      id: rides.id,
-      driverId: rides.driverId,
-      status: rides.status,
-      origin: rides.origin,
-      destination: rides.destination,
-    })
-    .from(rides)
-    .where(eq(rides.id, rideId));
+export async function cancelRide(rideId: string, driverId: string) {
+  return db.transaction(async (tx) => {
+    const [ride] = await tx
+      .select({
+        id: rides.id,
+        driverId: rides.driverId,
+        status: rides.status,
+        origin: rides.origin,
+        destination: rides.destination,
+        departureAt: rides.departureAt,
+      })
+      .from(rides)
+      .where(eq(rides.id, rideId))
+      .for('update');
 
-  if (!ride) {
-    throw CustomError.notFound('Ride not found.');
-  }
+    if (!ride) {
+      throw CustomError.notFound('Ride not found.');
+    }
 
-  if (ride.driverId !== driverId) {
-    throw CustomError.forbidden('Only the driver who owns this ride can cancel it.');
-  }
+    if (ride.driverId !== driverId) {
+      throw CustomError.forbidden('Only the driver who owns this ride can cancel it.');
+    }
 
-  if (ride.status === 'CANCELLED') {
-    throw CustomError.conflict('This ride has already been cancelled.');
-  }
+    if (ride.status === 'CANCELLED') {
+      throw CustomError.conflict('This ride has already been cancelled.');
+    }
 
-  const [cancelled] = await exec
-    .update(rides)
-    .set({ status: 'CANCELLED' })
-    .where(eq(rides.id, rideId))
-    .returning({
-      id: rides.id,
-      driverId: rides.driverId,
-      origin: rides.origin,
-      destination: rides.destination,
-      routeDescription: rides.routeDescription,
-      departureAt: rides.departureAt,
-      totalSeats: rides.totalSeats,
-      availableSeats: rides.availableSeats,
-      status: rides.status,
-      office: rides.office,
-      createdAt: rides.createdAt,
-    });
+    // Same guard as updateRideStatus, so both cancel paths agree.
+    const alreadyCompleted =
+      ride.status === 'COMPLETED' ||
+      ((ride.status === 'OPEN' || ride.status === 'FULL') && hasDeparted(ride.departureAt));
 
-  await notifyCancellation(ride, exec);
+    if (alreadyCompleted) {
+      throw CustomError.conflict(RIDE_ALREADY_COMPLETED);
+    }
 
-  return cancelled;
+    const [cancelled] = await tx
+      .update(rides)
+      .set({ status: 'CANCELLED' })
+      .where(eq(rides.id, rideId))
+      .returning({
+        id: rides.id,
+        driverId: rides.driverId,
+        origin: rides.origin,
+        destination: rides.destination,
+        routeDescription: rides.routeDescription,
+        departureAt: rides.departureAt,
+        totalSeats: rides.totalSeats,
+        availableSeats: rides.availableSeats,
+        status: rides.status,
+        office: rides.office,
+        createdAt: rides.createdAt,
+      });
+
+    await notifyCancellation(ride, tx);
+
+    return cancelled;
+  });
 }
 
-/** Changes a Ride's status at its Driver's request: manually closing, cancelling, or reopening it. */
+/**
+ * Changes a Ride's status at its Driver's request: manually closing, cancelling, or reopening it.
+ *
+ * Locks the ride row, same as `cancelRide`, so the change can't race an accept or a withdrawal,
+ * and a cancel's notifications commit or roll back together with the status change.
+ */
 export async function updateRideStatus(
   rideId: string,
   driverId: string,
   targetStatus: UpdateRideStatusInput['status'],
-  exec: Executor = db,
 ) {
-  const [ride] = await exec.select().from(rides).where(eq(rides.id, rideId));
+  return db.transaction(async (tx) => {
+    const [ride] = await tx.select().from(rides).where(eq(rides.id, rideId)).for('update');
 
-  if (!ride) {
-    throw CustomError.notFound(RIDE_NOT_FOUND);
-  }
-
-  if (ride.driverId !== driverId) {
-    throw CustomError.forbidden(NOT_RIDE_OWNER_STATUS);
-  }
-
-  if (ride.status === 'CANCELLED') {
-    throw CustomError.conflict(RIDE_ALREADY_CANCELLED);
-  }
-
-  const alreadyCompleted =
-    ride.status === 'COMPLETED' ||
-    ((ride.status === 'OPEN' || ride.status === 'FULL') && hasDeparted(ride.departureAt));
-
-  if (alreadyCompleted) {
-    throw CustomError.conflict(RIDE_ALREADY_COMPLETED);
-  }
-
-  if (ride.status === targetStatus) {
-    throw CustomError.conflict(RIDE_STATUS_UNCHANGED(targetStatus));
-  }
-
-  if (targetStatus === 'OPEN') {
-    if (ride.status !== 'FULL') {
-      throw CustomError.conflict(INVALID_STATUS_TRANSITION);
+    if (!ride) {
+      throw CustomError.notFound(RIDE_NOT_FOUND);
     }
 
-    if (ride.availableSeats <= 0) {
-      throw CustomError.conflict(RIDE_CANNOT_REOPEN);
+    if (ride.driverId !== driverId) {
+      throw CustomError.forbidden(NOT_RIDE_OWNER_STATUS);
     }
-  }
 
-  const [updated] = await exec
-    .update(rides)
-    .set({ status: targetStatus })
-    .where(eq(rides.id, rideId))
-    .returning({
-      id: rides.id,
-      driverId: rides.driverId,
-      status: rides.status,
-      availableSeats: rides.availableSeats,
-    });
+    if (ride.status === 'CANCELLED') {
+      throw CustomError.conflict(RIDE_ALREADY_CANCELLED);
+    }
 
-  // A status change cannot move the route, so the row already loaded above is still current.
-  const rideContext = {
-    id: ride.id,
-    driverId: ride.driverId,
-    origin: ride.origin,
-    destination: ride.destination,
-  };
+    const alreadyCompleted =
+      ride.status === 'COMPLETED' ||
+      ((ride.status === 'OPEN' || ride.status === 'FULL') && hasDeparted(ride.departureAt));
 
-  if (targetStatus === 'CANCELLED') {
-    // Same fan-out the dedicated cancel endpoint sends, so neither path can go silent.
-    await notifyCancellation(rideContext, exec);
-  } else {
-    // Closing or reopening the ride only concerns the passengers already holding a seat —
-    // those still waiting have no commitment to it yet.
-    await notifications.notifyRideUpdated(
-      rideContext,
-      await loadPassengerIds(rideId, ['ACCEPTED'], exec),
-      exec,
-    );
-  }
+    if (alreadyCompleted) {
+      throw CustomError.conflict(RIDE_ALREADY_COMPLETED);
+    }
 
-  return updated;
+    if (ride.status === targetStatus) {
+      throw CustomError.conflict(RIDE_STATUS_UNCHANGED(targetStatus));
+    }
+
+    if (targetStatus === 'OPEN') {
+      if (ride.status !== 'FULL') {
+        throw CustomError.conflict(INVALID_STATUS_TRANSITION);
+      }
+
+      if (ride.availableSeats <= 0) {
+        throw CustomError.conflict(RIDE_CANNOT_REOPEN);
+      }
+    }
+
+    const [updated] = await tx
+      .update(rides)
+      .set({ status: targetStatus })
+      .where(eq(rides.id, rideId))
+      .returning({
+        id: rides.id,
+        driverId: rides.driverId,
+        status: rides.status,
+        availableSeats: rides.availableSeats,
+      });
+
+    // A status change cannot move the route, so the row already loaded above is still current.
+    const rideContext = {
+      id: ride.id,
+      driverId: ride.driverId,
+      origin: ride.origin,
+      destination: ride.destination,
+    };
+
+    if (targetStatus === 'CANCELLED') {
+      // Same fan-out the dedicated cancel endpoint sends, so neither path can go silent.
+      await notifyCancellation(rideContext, tx);
+    } else {
+      // Closing or reopening the ride only concerns the passengers already holding a seat —
+      // those still waiting have no commitment to it yet.
+      await notifications.notifyRideUpdated(
+        rideContext,
+        await loadPassengerIds(rideId, ['ACCEPTED'], tx),
+        tx,
+      );
+    }
+
+    return updated;
+  });
 }
 
 /**

@@ -611,6 +611,32 @@ describe('PATCH /rides/:rideId/requests/:requestId/withdraw', () => {
     expect(updatedRide.status).toBe('OPEN');
   });
 
+  it('keeps a ride the driver marked Full by hand closed when a passenger withdraws', async () => {
+    const driver = await registerUser('Grace Hopper');
+    const ride = await postRide(driver, { availableSeats: 3 });
+    const passenger = await registerUser('Ada Lovelace');
+    const created = await requestToJoin(ride.id, passenger);
+    await request(app)
+      .patch(`/api/rides/${ride.id}/requests/${created.body.data.id}/accept`)
+      .set('Cookie', driver.cookie);
+    // 2 of 3 seats are still free, but the driver closes the ride anyway.
+    const markedFull = await request(app)
+      .patch(`/api/rides/${ride.id}/status`)
+      .set('Cookie', driver.cookie)
+      .send({ status: 'FULL' });
+    expect(markedFull.status).toBe(200);
+
+    const response = await request(app)
+      .patch(`/api/rides/${ride.id}/requests/${created.body.data.id}/withdraw`)
+      .set('Cookie', passenger.cookie);
+
+    expect(response.status).toBe(200);
+
+    const [updatedRide] = await db.select().from(rides).where(eq(rides.id, ride.id));
+    expect(updatedRide.availableSeats).toBe(3);
+    expect(updatedRide.status).toBe('FULL');
+  });
+
   it('rejects withdrawing a request that belongs to someone else', async () => {
     const driver = await registerUser('Grace Hopper');
     const ride = await postRide(driver);

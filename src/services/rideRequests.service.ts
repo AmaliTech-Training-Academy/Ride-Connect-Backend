@@ -211,6 +211,7 @@ export async function declineRequest(rideId: string, requestId: string, driverId
       .select({
         id: rides.id,
         driverId: rides.driverId,
+        status: rides.status,
         origin: rides.origin,
         destination: rides.destination,
       })
@@ -224,6 +225,10 @@ export async function declineRequest(rideId: string, requestId: string, driverId
 
     if (ride.driverId !== driverId) {
       throw CustomError.forbidden(NOT_RIDE_OWNER_DECLINE);
+    }
+
+    if (ride.status === 'CANCELLED') {
+      throw CustomError.conflict(RIDE_CANCELLED);
     }
 
     const [joinRequest] = await tx
@@ -314,6 +319,10 @@ export async function rerequestRequest(rideId: string, requestId: string, passen
       throw CustomError.forbidden(CANNOT_JOIN_OWN_RIDE);
     }
 
+    if (ride.status === 'CANCELLED') {
+      throw CustomError.conflict(RIDE_CANCELLED);
+    }
+
     if (joinRequest.status !== 'DECLINED') {
       throw CustomError.conflict(REQUEST_NOT_DECLINED);
     }
@@ -383,16 +392,23 @@ export async function withdrawRequest(rideId: string, requestId: string, passeng
       throw CustomError.forbidden(NOT_REQUEST_OWNER);
     }
 
+    if (ride.status === 'CANCELLED') {
+      throw CustomError.conflict(RIDE_CANCELLED);
+    }
+
     if (joinRequest.status === 'DECLINED' || joinRequest.status === 'WITHDRAWN') {
       throw CustomError.conflict(REQUEST_ALREADY_INACTIVE);
     }
 
     if (joinRequest.status === 'ACCEPTED') {
       const availableSeats = Math.min(ride.availableSeats + 1, ride.totalSeats);
+      // Only reopen a ride that was full because it ran out of seats. If the driver marked it
+      // Full by hand while seats were left, that choice stands.
+      const ranOutOfSeats = ride.status === 'FULL' && ride.availableSeats === 0;
 
       await tx
         .update(rides)
-        .set({ availableSeats, status: ride.status === 'FULL' ? 'OPEN' : ride.status })
+        .set({ availableSeats, status: ranOutOfSeats ? 'OPEN' : ride.status })
         .where(eq(rides.id, rideId));
     }
 

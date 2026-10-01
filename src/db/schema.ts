@@ -88,6 +88,8 @@ export const rides = pgTable(
     index('idx_rides_driver_id').on(table.driverId),
     index('idx_rides_departure_at').on(table.departureAt),
     index('idx_rides_status').on(table.status),
+    // Browsing rides filters on status and sorts by departure time.
+    index('idx_rides_status_departure_at').on(table.status, table.departureAt),
   ],
 );
 

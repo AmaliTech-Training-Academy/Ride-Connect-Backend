@@ -4,6 +4,8 @@ import { office, requestStatus, rideStatus } from '../db/schema';
 
 const MIN_SEATS = 1;
 const MAX_SEATS = 8;
+const DEFAULT_PAGE_SIZE = 20;
+const MAX_PAGE_SIZE = 50;
 
 const SEATS_OUT_OF_RANGE = `Available seats must be between ${MIN_SEATS} and ${MAX_SEATS}.`;
 const INVALID_OFFICE = 'Office must be one of KUMASI, ACCRA, or TAKORADI.';
@@ -103,6 +105,17 @@ export const listRidesSchema = z.object({
     .optional()
     .transform((value) => (value ? value : undefined)),
   office: z.enum(office.enumValues, { error: INVALID_OFFICE }).optional(),
+  limit: z.coerce
+    .number('Limit must be a number.')
+    .int('Limit must be a whole number.')
+    .min(1, 'Limit must be at least 1.')
+    .max(MAX_PAGE_SIZE, `Limit must be ${MAX_PAGE_SIZE} or fewer.`)
+    .default(DEFAULT_PAGE_SIZE),
+  offset: z.coerce
+    .number('Offset must be a number.')
+    .int('Offset must be a whole number.')
+    .min(0, 'Offset cannot be negative.')
+    .default(0),
 });
 
 export type ListRidesQuery = z.infer<typeof listRidesSchema>;

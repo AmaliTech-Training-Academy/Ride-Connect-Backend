@@ -1,7 +1,10 @@
+import { eq } from 'drizzle-orm';
 import request from 'supertest';
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 
 import { createApp } from '../src/app';
+import { db } from '../src/db';
+import { rides } from '../src/db/schema';
 import { closeDb, resetAuthTables, uniqueEmail } from './helpers';
 
 const app = createApp();
@@ -101,5 +104,29 @@ describe('PATCH /rides/:rideId/status', () => {
       .set('Cookie', driver.cookie);
 
     expect(response.status).toBe(409);
+  });
+
+  it('does not reopen a ride whose last seat is taken while the reopen is waiting', async () => {
+    const driver = await registerUser('Grace Hopper');
+    const ride = await postRide(driver);
+    // The driver closed the ride by hand with 1 of 2 seats still free.
+    await db.update(rides).set({ status: 'FULL', availableSeats: 1 }).where(eq(rides.id, ride.id));
+
+    let reopen!: Promise<request.Response>;
+    // Stands in for an accept: it locks the ride and takes the last seat while the reopen arrives.
+    await db.transaction(async (tx) => {
+      await tx.select().from(rides).where(eq(rides.id, ride.id)).for('update');
+      // `.then` sends the request now, rather than when it is awaited after the lock is gone.
+      reopen = setStatus(ride.id, 'OPEN', driver).then((response) => response);
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      await tx.update(rides).set({ availableSeats: 0 }).where(eq(rides.id, ride.id));
+    });
+
+    const response = await reopen;
+    const [updatedRide] = await db.select().from(rides).where(eq(rides.id, ride.id));
+
+    expect(response.status).toBe(409);
+    expect(updatedRide.status).toBe('FULL');
+    expect(updatedRide.availableSeats).toBe(0);
   });
 });
