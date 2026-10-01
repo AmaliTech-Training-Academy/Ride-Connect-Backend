@@ -26,6 +26,9 @@ import {
 /** Lifecycle of a posted ride. */
 export const rideStatus = pgEnum('ride_status', ['OPEN', 'FULL', 'CANCELLED', 'COMPLETED']);
 
+/** The AmaliTech office a ride belongs to. Set per ride, not per user. */
+export const office = pgEnum('office', ['KUMASI', 'ACCRA', 'TAKORADI']);
+
 /** Lifecycle of a passenger's request to join a ride. */
 export const requestStatus = pgEnum('request_status', [
   'PENDING',
@@ -68,6 +71,7 @@ export const rides = pgTable(
     totalSeats: integer('total_seats').notNull(),
     availableSeats: integer('available_seats').notNull(),
     status: rideStatus('status').notNull().default('OPEN'),
+    office: office('office').notNull(),
     createdAt: timestamp('created_at', { withTimezone: true }).default(sql`CURRENT_TIMESTAMP`),
     updatedAt: timestamp('updated_at', { withTimezone: true }).default(sql`CURRENT_TIMESTAMP`),
   },
@@ -84,6 +88,8 @@ export const rides = pgTable(
     index('idx_rides_driver_id').on(table.driverId),
     index('idx_rides_departure_at').on(table.departureAt),
     index('idx_rides_status').on(table.status),
+    // Browsing rides filters on status and sorts by departure time.
+    index('idx_rides_status_departure_at').on(table.status, table.departureAt),
   ],
 );
 

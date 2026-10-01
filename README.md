@@ -29,6 +29,25 @@ npm run dev
 
 > Setup details (env vars, database, scripts) will be added as the project is scaffolded.
 
+## Registration is restricted to AmaliTech addresses
+
+Sign-up only accepts `@amalitech.com` and `@amalitechtraining.org` addresses. The rule is
+enforced in the backend, on the `users` model itself (better-auth's `user.create.before`
+hook), so calling `POST /api/auth/sign-up/email` directly cannot get around it. The allowed
+domains live in one place, `ALLOWED_EMAIL_DOMAINS` in the environment (see `.env.example`),
+and default to `amalitech.com,amalitechtraining.org`.
+
+Only exact matches pass: subdomains (`user@mail.amalitech.com`) and look-alikes
+(`user@notamalitech.com`, `user@amalitech.com.evil.com`, `user@amalitech.org`) are rejected.
+A rejected attempt writes no user and no session, and is answered with:
+
+```json
+403 Forbidden
+{ "message": "Registration is restricted to @amalitech.com or @amalitechtraining.org email addresses.", "code": "EMAIL_DOMAIN_NOT_ALLOWED" }
+```
+
+Sign-in is unaffected — accounts that already exist keep working whatever their domain.
+
 ## Profile endpoints
 
 These are provided by better-auth under `/api/auth`. All of them need the session cookie, so call them with `credentials: 'include'`.

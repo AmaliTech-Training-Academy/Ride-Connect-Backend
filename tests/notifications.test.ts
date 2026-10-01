@@ -1,7 +1,10 @@
+import { eq } from 'drizzle-orm';
 import request from 'supertest';
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 
 import { createApp } from '../src/app';
+import { db } from '../src/db';
+import { rides } from '../src/db/schema';
 import { closeDb, resetAuthTables, uniqueEmail } from './helpers';
 
 const app = createApp();
@@ -69,6 +72,7 @@ async function postRide(
       departureDate: date,
       departureTime: time,
       availableSeats: 3,
+      office: 'KUMASI',
       ...overrides,
     });
 
@@ -302,6 +306,93 @@ describe('notifications created by ride activity', () => {
     expect(await typesFor(declined)).not.toContain('RIDE_CANCELLED');
     // Nor does the driver need telling about their own action.
     expect(await typesFor(driver)).not.toContain('RIDE_CANCELLED');
+  });
+
+  it('does not cancel a completed ride or notify its passengers', async () => {
+    const driver = await registerUser('Grace Hopper');
+    const ride = await postRide(driver);
+    const passenger = await registerUser('Ada Lovelace');
+    await joinRide(ride.id, passenger);
+    await db.update(rides).set({ status: 'COMPLETED' }).where(eq(rides.id, ride.id));
+
+    const response = await cancelRide(ride.id, driver);
+
+    expect(response.status).toBe(409);
+    expect(await typesFor(passenger)).not.toContain('RIDE_CANCELLED');
+  });
+
+  it('does not cancel a ride that has already departed', async () => {
+    const driver = await registerUser('Grace Hopper');
+    const ride = await postRide(driver);
+    const passenger = await registerUser('Ada Lovelace');
+    await joinRide(ride.id, passenger);
+    // Still OPEN, but the departure time has passed.
+    await db
+      .update(rides)
+      .set({ departureAt: new Date(Date.now() - 60 * 60 * 1000) })
+      .where(eq(rides.id, ride.id));
+
+    const response = await cancelRide(ride.id, driver);
+
+    expect(response.status).toBe(409);
+    expect(await typesFor(passenger)).not.toContain('RIDE_CANCELLED');
+  });
+
+  it('does not let the driver decline a request on a cancelled ride', async () => {
+    const driver = await registerUser('Grace Hopper');
+    const ride = await postRide(driver);
+    const passenger = await registerUser('Ada Lovelace');
+    const requestId = await joinRide(ride.id, passenger);
+    await cancelRide(ride.id, driver);
+
+    const response = await request(app)
+      .patch(`/api/rides/${ride.id}/requests/${requestId}/decline`)
+      .set('Cookie', driver.cookie)
+      .send({ reason: 'No room left on this trip, sorry.' });
+
+    expect(response.status).toBe(409);
+  });
+
+  it('does not let a passenger withdraw from a cancelled ride', async () => {
+    const driver = await registerUser('Grace Hopper');
+    const ride = await postRide(driver);
+    const passenger = await registerUser('Ada Lovelace');
+    const requestId = await joinRide(ride.id, passenger);
+    await decide(ride.id, requestId, 'accept', driver);
+    await cancelRide(ride.id, driver);
+
+    const response = await withdraw(ride.id, requestId, passenger);
+
+    expect(response.status).toBe(409);
+  });
+
+  it('does not let a passenger re-request on a cancelled ride', async () => {
+    const driver = await registerUser('Grace Hopper');
+    const ride = await postRide(driver);
+    const passenger = await registerUser('Ada Lovelace');
+    const requestId = await joinRide(ride.id, passenger);
+    await decide(ride.id, requestId, 'decline', driver);
+    await cancelRide(ride.id, driver);
+
+    const response = await rerequest(ride.id, requestId, passenger);
+
+    expect(response.status).toBe(409);
+  });
+
+  it('moves a cancelled ride to the passenger\'s past and cancelled list', async () => {
+    const driver = await registerUser('Grace Hopper');
+    const ride = await postRide(driver);
+    const passenger = await registerUser('Ada Lovelace');
+    const requestId = await joinRide(ride.id, passenger);
+    await decide(ride.id, requestId, 'accept', driver);
+    await cancelRide(ride.id, driver);
+
+    const response = await request(app).get('/api/rides/mine').set('Cookie', passenger.cookie);
+
+    expect(response.status).toBe(200);
+    expect(response.body.data.joined).toEqual([]);
+    expect(response.body.data.joinedPastAndCancelled).toHaveLength(1);
+    expect(response.body.data.joinedPastAndCancelled[0].status).toBe('CANCELLED');
   });
 
   it('sends the same cancellation from the status endpoint', async () => {

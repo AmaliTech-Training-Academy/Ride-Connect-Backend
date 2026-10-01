@@ -1,10 +1,10 @@
-import { eq } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import request from 'supertest';
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 
 import { createApp } from '../src/app';
 import { db } from '../src/db';
-import { rideRequests, rides } from '../src/db/schema';
+import { notifications, rideRequests, rides } from '../src/db/schema';
 import { closeDb, resetAuthTables, uniqueEmail } from './helpers';
 
 const app = createApp();
@@ -57,6 +57,7 @@ async function postRide(
       departureDate: date,
       departureTime: time,
       availableSeats: 1,
+      office: 'KUMASI',
       ...overrides,
     });
 
@@ -610,6 +611,32 @@ describe('PATCH /rides/:rideId/requests/:requestId/withdraw', () => {
     expect(updatedRide.status).toBe('OPEN');
   });
 
+  it('keeps a ride the driver marked Full by hand closed when a passenger withdraws', async () => {
+    const driver = await registerUser('Grace Hopper');
+    const ride = await postRide(driver, { availableSeats: 3 });
+    const passenger = await registerUser('Ada Lovelace');
+    const created = await requestToJoin(ride.id, passenger);
+    await request(app)
+      .patch(`/api/rides/${ride.id}/requests/${created.body.data.id}/accept`)
+      .set('Cookie', driver.cookie);
+    // 2 of 3 seats are still free, but the driver closes the ride anyway.
+    const markedFull = await request(app)
+      .patch(`/api/rides/${ride.id}/status`)
+      .set('Cookie', driver.cookie)
+      .send({ status: 'FULL' });
+    expect(markedFull.status).toBe(200);
+
+    const response = await request(app)
+      .patch(`/api/rides/${ride.id}/requests/${created.body.data.id}/withdraw`)
+      .set('Cookie', passenger.cookie);
+
+    expect(response.status).toBe(200);
+
+    const [updatedRide] = await db.select().from(rides).where(eq(rides.id, ride.id));
+    expect(updatedRide.availableSeats).toBe(3);
+    expect(updatedRide.status).toBe('FULL');
+  });
+
   it('rejects withdrawing a request that belongs to someone else', async () => {
     const driver = await registerUser('Grace Hopper');
     const ride = await postRide(driver);
@@ -655,5 +682,131 @@ describe('PATCH /rides/:rideId/requests/:requestId/withdraw', () => {
       .set('Cookie', passenger.cookie);
 
     expect(response.status).toBe(409);
+  });
+});
+
+/**
+ * The four decision endpoints are compare-and-swaps: each guards its write on the status it
+ * expects, so a second call — or a racing one — loses with the same 409 its pre-check raises.
+ */
+describe('Race-safe request decisions', () => {
+  const ALREADY_DECIDED = 'This request has already been decided.';
+  const NOT_DECLINED = 'You can only request again after your request has been declined.';
+
+  /** Accepts a request as the owning driver. */
+  function acceptAs(driver: AuthedUser, rideId: string, requestId: string) {
+    return request(app)
+      .patch(`/api/rides/${rideId}/requests/${requestId}/accept`)
+      .set('Cookie', driver.cookie);
+  }
+
+  /**
+   * The decision notifications written for one request.
+   *
+   * Filtered by type because the request also carries the `RIDE_REQUEST_RECEIVED` notification
+   * the driver got when it was first submitted; this is about the *decision*, of which there
+   * must be exactly one however many callers raced for it.
+   */
+  function decisionNotifications(requestId: string) {
+    return db
+      .select()
+      .from(notifications)
+      .where(
+        and(
+          eq(notifications.requestId, requestId),
+          inArray(notifications.type, ['REQUEST_ACCEPTED', 'REQUEST_DECLINED']),
+        ),
+      );
+  }
+
+  it('rejects a second accept of the same request with 409', async () => {
+    const driver = await registerUser('Grace Hopper');
+    const ride = await postRide(driver, { availableSeats: 2 });
+    const passenger = await registerUser('Ada Lovelace');
+    const created = await requestToJoin(ride.id, passenger);
+    const requestId = created.body.data.id;
+
+    const first = await acceptAs(driver, ride.id, requestId);
+    const second = await acceptAs(driver, ride.id, requestId);
+
+    expect(first.status).toBe(200);
+    expect(second.status).toBe(409);
+    expect(second.body.message).toBe(ALREADY_DECIDED);
+
+    const [updatedRide] = await db.select().from(rides).where(eq(rides.id, ride.id));
+    expect(updatedRide.availableSeats).toBe(1);
+    expect(await decisionNotifications(requestId)).toHaveLength(1);
+  });
+
+  it('rejects a second decline of the same request with 409', async () => {
+    const driver = await registerUser('Grace Hopper');
+    const ride = await postRide(driver);
+    const passenger = await registerUser('Ada Lovelace');
+    const created = await requestToJoin(ride.id, passenger);
+    const requestId = created.body.data.id;
+
+    const first = await declineAs(driver, ride.id, requestId);
+    const second = await declineAs(driver, ride.id, requestId);
+
+    expect(first.status).toBe(200);
+    expect(second.status).toBe(409);
+    expect(second.body.message).toBe(ALREADY_DECIDED);
+
+    expect(await decisionNotifications(requestId)).toHaveLength(1);
+  });
+
+  it('rejects a second re-request of the same request with 409', async () => {
+    const driver = await registerUser('Grace Hopper');
+    const ride = await postRide(driver);
+    const passenger = await registerUser('Ada Lovelace');
+    const created = await requestToJoin(ride.id, passenger);
+    const requestId = created.body.data.id;
+    await declineAs(driver, ride.id, requestId);
+
+    const first = await rerequestAs(passenger, ride.id, requestId);
+    const second = await rerequestAs(passenger, ride.id, requestId);
+
+    expect(first.status).toBe(200);
+    expect(second.status).toBe(409);
+    expect(second.body.message).toBe(NOT_DECLINED);
+
+    const [stored] = await db.select().from(rideRequests).where(eq(rideRequests.id, requestId));
+    expect(stored.rerequestCount).toBe(1);
+  });
+
+  it('lets only one of a concurrent accept and decline win', async () => {
+    const driver = await registerUser('Grace Hopper');
+    const ride = await postRide(driver, { availableSeats: 2 });
+    const passenger = await registerUser('Ada Lovelace');
+    const created = await requestToJoin(ride.id, passenger);
+    const requestId = created.body.data.id;
+
+    // The pool hands each call its own connection, so these two transactions really do meet.
+    const [acceptResponse, declineResponse] = await Promise.all([
+      acceptAs(driver, ride.id, requestId),
+      declineAs(driver, ride.id, requestId),
+    ]);
+
+
+    expect([acceptResponse.status, declineResponse.status].sort()).toEqual([200, 409]);
+
+    const [stored] = await db.select().from(rideRequests).where(eq(rideRequests.id, requestId));
+    const [updatedRide] = await db.select().from(rides).where(eq(rides.id, ride.id));
+
+    // The seat is spent only if the accept actually won, and the two agree with each other.
+    if (stored.status === 'ACCEPTED') {
+      expect(acceptResponse.status).toBe(200);
+      expect(updatedRide.availableSeats).toBe(1);
+    } else {
+      expect(stored.status).toBe('DECLINED');
+      expect(declineResponse.status).toBe(200);
+      expect(updatedRide.availableSeats).toBe(2);
+    }
+
+    const written = await decisionNotifications(requestId);
+    expect(written).toHaveLength(1);
+    expect(written[0]?.type).toBe(
+      stored.status === 'ACCEPTED' ? 'REQUEST_ACCEPTED' : 'REQUEST_DECLINED',
+    );
   });
 });

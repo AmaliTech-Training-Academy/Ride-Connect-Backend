@@ -1,16 +1,19 @@
 import { z } from 'zod';
 
-import { requestStatus, rideStatus } from '../db/schema';
+import { office, requestStatus, rideStatus } from '../db/schema';
 
 const MIN_SEATS = 1;
 const MAX_SEATS = 8;
+const DEFAULT_PAGE_SIZE = 20;
+const MAX_PAGE_SIZE = 50;
 
 const SEATS_OUT_OF_RANGE = `Available seats must be between ${MIN_SEATS} and ${MAX_SEATS}.`;
+const INVALID_OFFICE = 'Office must be one of KUMASI, ACCRA, or TAKORADI.';
 
 const requiredOr = (required: string, malformed: string) => (issue: { input: unknown }) =>
   issue.input === undefined || issue.input === '' ? required : malformed;
 
-const toDepartureInstant = (date: string, time: string): Date => new Date(`${date}T${time}Z`);
+export const toDepartureInstant =(date: string, time: string): Date => new Date(`${date}T${time}Z`);
 
 export const createRideSchema = z
   .object({
@@ -33,6 +36,7 @@ export const createRideSchema = z
       .int(SEATS_OUT_OF_RANGE)
       .min(MIN_SEATS, SEATS_OUT_OF_RANGE)
       .max(MAX_SEATS, SEATS_OUT_OF_RANGE),
+    office: z.enum(office.enumValues, { error: requiredOr('Office is required.', INVALID_OFFICE) }),
   })
   .superRefine((ride, ctx) => {
     if (ride.origin.toLowerCase() === ride.destination.toLowerCase()) {
@@ -57,9 +61,41 @@ export const createRideSchema = z
     routeDescription: ride.routeDescription,
     seatsOffered: ride.availableSeats,
     departureAt: toDepartureInstant(ride.departureDate, ride.departureTime),
+    office: ride.office,
   }));
 
 export type CreateRideInput = z.infer<typeof createRideSchema>;
+
+const TOTAL_SEATS_OUT_OF_RANGE = `Total seats must be between ${MIN_SEATS} and ${MAX_SEATS}.`;
+
+/**
+ * Body for editing a ride. Every field is optional, only what is sent gets changed. Checks that
+ * need the ride's current values (origin vs destination, departure in the past, seats already
+ * taken) are done in the service, since only one side of the pair may have been sent.
+ */
+export const updateRideSchema = z
+  .object({
+    origin: z.string().trim().min(1, 'Origin cannot be empty.').optional(),
+    destination: z.string().trim().min(1, 'Destination cannot be empty.').optional(),
+    routeDescription: z
+      .string()
+      .trim()
+      .max(500, 'Route description must be 500 characters or fewer.')
+      .optional(),
+    departureDate: z.iso.date({ error: 'Departure date is invalid. Use YYYY-MM-DD.' }).optional(),
+    departureTime: z.iso.time({ error: 'Departure time is invalid. Use HH:MM.' }).optional(),
+    totalSeats: z.coerce
+      .number()
+      .int(TOTAL_SEATS_OUT_OF_RANGE)
+      .min(MIN_SEATS, TOTAL_SEATS_OUT_OF_RANGE)
+      .max(MAX_SEATS, TOTAL_SEATS_OUT_OF_RANGE)
+      .optional(),
+  })
+  .refine((body) => Object.values(body).some((value) => value !== undefined), {
+    message: 'Send at least one field to update.',
+  });
+
+export type UpdateRideInput = z.infer<typeof updateRideSchema>;
 
 export const listRidesSchema = z.object({
   date: z.iso.date({ error: 'Invalid date. Use YYYY-MM-DD.' }).optional(),
@@ -68,6 +104,18 @@ export const listRidesSchema = z.object({
     .trim()
     .optional()
     .transform((value) => (value ? value : undefined)),
+  office: z.enum(office.enumValues, { error: INVALID_OFFICE }).optional(),
+  limit: z.coerce
+    .number('Limit must be a number.')
+    .int('Limit must be a whole number.')
+    .min(1, 'Limit must be at least 1.')
+    .max(MAX_PAGE_SIZE, `Limit must be ${MAX_PAGE_SIZE} or fewer.`)
+    .default(DEFAULT_PAGE_SIZE),
+  offset: z.coerce
+    .number('Offset must be a number.')
+    .int('Offset must be a whole number.')
+    .min(0, 'Offset cannot be negative.')
+    .default(0),
 });
 
 export type ListRidesQuery = z.infer<typeof listRidesSchema>;
@@ -84,6 +132,7 @@ export const rideResponseSchema = z.object({
   totalSeats: z.number().int(),
   availableSeats: z.number().int(),
   status: z.enum(rideStatus.enumValues),
+  office: z.enum(office.enumValues),
   createdAt: z.iso.datetime().nullable(),
 });
 
