@@ -402,10 +402,13 @@ export async function withdrawRequest(rideId: string, requestId: string, passeng
 
     if (joinRequest.status === 'ACCEPTED') {
       const availableSeats = Math.min(ride.availableSeats + 1, ride.totalSeats);
+      // Only reopen a ride that was full because it ran out of seats. If the driver marked it
+      // Full by hand while seats were left, that choice stands.
+      const ranOutOfSeats = ride.status === 'FULL' && ride.availableSeats === 0;
 
       await tx
         .update(rides)
-        .set({ availableSeats, status: ride.status === 'FULL' ? 'OPEN' : ride.status })
+        .set({ availableSeats, status: ranOutOfSeats ? 'OPEN' : ride.status })
         .where(eq(rides.id, rideId));
     }
 
