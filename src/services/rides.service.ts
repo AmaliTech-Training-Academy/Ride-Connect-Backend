@@ -83,7 +83,9 @@ export async function listRides(filters: ListRidesQuery, exec: Executor = db) {
   }
 
   if (filters.search) {
-    const keyword = `%${filters.search}%`;
+    // Escape ILIKE's wildcards so a typed `%` or `_` matches itself. `\` goes first, as it is the escape character.
+    const escaped = filters.search.replace(/[\\%_]/g, (char) => `\\${char}`);
+    const keyword = `%${escaped}%`;
     // The office is an enum, so it is cast to text to be matched like the route.
     const routeMatch = or(
       ilike(rides.origin, keyword),

@@ -337,6 +337,31 @@ describe('GET /rides', () => {
     expect(response.body.data).toHaveLength(2);
   });
 
+  it('treats % in the search keyword as a literal character', async () => {
+    await postRide({ origin: 'Accra', destination: 'Kumasi' });
+    await postRide({ origin: 'Gate 100% Mall', destination: 'Tema' });
+
+    const cookie = await registerDriver();
+    const response = await request(app).get('/api/rides').set('Cookie', cookie).query({ search: '%' });
+
+    expect(response.status).toBe(200);
+    expect(response.body.data).toHaveLength(1);
+    expect(response.body.data[0].origin).toBe('Gate 100% Mall');
+  });
+
+  it('treats _ and \\ in the search keyword as literal characters', async () => {
+    await postRide({ origin: 'Accra', destination: 'Kumasi' });
+    await postRide({ origin: 'Site_B', destination: 'Tema' });
+    await postRide({ origin: 'Block\\C', destination: 'Ho' });
+
+    const cookie = await registerDriver();
+    const underscore = await request(app).get('/api/rides').set('Cookie', cookie).query({ search: '_' });
+    const backslash = await request(app).get('/api/rides').set('Cookie', cookie).query({ search: '\\' });
+
+    expect(underscore.body.data.map((ride: { origin: string }) => ride.origin)).toEqual(['Site_B']);
+    expect(backslash.body.data.map((ride: { origin: string }) => ride.origin)).toEqual(['Block\\C']);
+  });
+
   it('returns a friendly message when nothing matches the date filter', async () => {
     await postRide();
 
