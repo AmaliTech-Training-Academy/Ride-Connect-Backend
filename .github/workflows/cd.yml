@@ -71,8 +71,31 @@ jobs:
       - name: Sync stack files
         run: |
           ssh ${{ secrets.DOCKER_EC2_USER }}@${{ secrets.DOCKER_EC2_HOST }} "mkdir -p /opt/ride-connect"
-          rsync -avz deploy/compose.yml deploy/Caddyfile \
+          rsync -avz --inplace deploy/compose.yml deploy/Caddyfile \
             ${{ secrets.DOCKER_EC2_USER }}@${{ secrets.DOCKER_EC2_HOST }}:/opt/ride-connect/
+
+      - name: Write Dozzle users
+        env:
+          TARGET: ${{ secrets.DOCKER_EC2_USER }}@${{ secrets.DOCKER_EC2_HOST }}
+          DOZZLE_USERS: ${{ secrets.DOZZLE_USERS }}
+        run: |
+          if [ -z "$DOZZLE_USERS" ]; then
+            echo "DOZZLE_USERS secret is not set." >&2
+            exit 1
+          fi
+          printf '%s\n' "$DOZZLE_USERS" | ssh "$TARGET" '
+            set -e
+            mkdir -p /opt/ride-connect/dozzle
+            cd /opt/ride-connect/dozzle
+            umask 077
+            cat > users.yml.new
+            if cmp -s users.yml.new users.yml; then
+              rm users.yml.new
+            else
+              mv users.yml.new users.yml
+              touch .restart
+            fi
+          '
 
       - name: Log the host in to GHCR
         env:
@@ -95,4 +118,9 @@ jobs:
             rm \"\$TMP\"
             docker compose pull
             docker compose up -d
+            docker compose exec -T caddy caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile
+            if [ -f dozzle/.restart ]; then
+              docker compose restart dozzle
+              rm dozzle/.restart
+            fi
           "
