@@ -222,16 +222,22 @@ describe('PATCH /rides/:rideId/requests/:requestId/accept', () => {
     const [updatedRide] = await db.select().from(rides).where(eq(rides.id, ride.id));
     expect(updatedRide.availableSeats).toBe(1);
     expect(updatedRide.status).toBe('OPEN');
+
+    // RID-90 guard: FULL is set only when the seats actually run out, so a ride that
+    // still has a free seat must remain browsable.
+    const listing = await request(app).get('/api/rides').set('Cookie', passenger.cookie);
+    expect(listing.body.data.map((listed: { id: string }) => listed.id)).toContain(ride.id);
   });
 
-  it('moves the ride to FULL when accepting takes the last seat', async () => {
+  it('RID-90: accepting the last seat sets status FULL and available_seats 0', async () => {
     const driver = await registerUser('Grace Hopper');
     const ride = await postRide(driver, { availableSeats: 1 });
     const passenger = await registerUser('Ada Lovelace');
     const created = await requestToJoin(ride.id, passenger);
+    const requestId = created.body.data.id;
 
     const response = await request(app)
-      .patch(`/api/rides/${ride.id}/requests/${created.body.data.id}/accept`)
+      .patch(`/api/rides/${ride.id}/requests/${requestId}/accept`)
       .set('Cookie', driver.cookie);
 
     expect(response.status).toBe(200);
@@ -239,6 +245,31 @@ describe('PATCH /rides/:rideId/requests/:requestId/accept', () => {
     const [updatedRide] = await db.select().from(rides).where(eq(rides.id, ride.id));
     expect(updatedRide.availableSeats).toBe(0);
     expect(updatedRide.status).toBe('FULL');
+
+    // The seat was spent on this request, not just on the ride's counters.
+    const [accepted] = await db.select().from(rideRequests).where(eq(rideRequests.id, requestId));
+    expect(accepted.status).toBe('ACCEPTED');
+  });
+
+  it('RID-90: a ride that fills on its last accepted seat drops out of GET /rides', async () => {
+    const driver = await registerUser('Grace Hopper');
+    const ride = await postRide(driver, { availableSeats: 1 });
+    const passenger = await registerUser('Ada Lovelace');
+    const created = await requestToJoin(ride.id, passenger);
+
+    // Browsed by a colleague, and confirmed listed before the seat is taken: without this
+    // the assertion after acceptance could pass because the filter hid it for another reason.
+    const colleague = await registerUser('Alan Turing');
+    const before = await request(app).get('/api/rides').set('Cookie', colleague.cookie);
+    expect(before.body.data.map((listed: { id: string }) => listed.id)).toContain(ride.id);
+
+    const response = await request(app)
+      .patch(`/api/rides/${ride.id}/requests/${created.body.data.id}/accept`)
+      .set('Cookie', driver.cookie);
+    expect(response.status).toBe(200);
+
+    const after = await request(app).get('/api/rides').set('Cookie', colleague.cookie);
+    expect(after.body.data.map((listed: { id: string }) => listed.id)).not.toContain(ride.id);
   });
 
   it('rejects accepting when no seats remain', async () => {
