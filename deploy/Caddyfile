@@ -7,6 +7,12 @@
 	handle @api {
 		reverse_proxy api:3000
 	}
+	@logs path /logs /logs/*
+	handle @logs {
+		reverse_proxy dozzle:8080 {
+			flush_interval -1
+		}
+	}
 	handle {
 		reverse_proxy frontend:80
 	}
