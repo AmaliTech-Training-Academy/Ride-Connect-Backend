@@ -19,6 +19,19 @@ Repository secrets for this workflow, separate from the current host:
 - `DOCKER_EC2_USER`
 - `DOCKER_EC2_SSH_KEY` (same private key as the current host)
 - `DOCKER_EC2_INSTANCE_ID`
+- `DOZZLE_USERS` (the `users.yml` for the log viewer, see below)
+
+## Log viewer
+
+Dozzle serves live container logs at `https://<SITE_ADDRESS>/logs`. It reads Docker through a socket proxy that only allows read calls, so the viewer cannot start, stop, or exec into containers.
+
+Generate an entry per teammate. The password is read from stdin and stored as a bcrypt hash:
+
+```bash
+docker run -it --rm amir20/dozzle:v11.1.3 generate <username> --name "<Full Name>" --email <email> --user-roles download > user.yml
+```
+
+Merge the entries under a single `users:` key and save the whole file as the `DOZZLE_USERS` secret. Each deploy writes it to `/opt/ride-connect/dozzle/users.yml` and restarts Dozzle when it changed. To add or remove someone, update the secret and redeploy.
 
 After the first push, set the GHCR package `ride-connect-api` to public.
 
