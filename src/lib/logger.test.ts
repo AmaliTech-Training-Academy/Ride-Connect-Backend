@@ -1,29 +1,39 @@
-import { logger } from './logger';
+import { logger, pinoLogger } from './logger';
 
-describe('logger.stream', () => {
-  const originalInfo = logger.info;
-  let lines: unknown[][];
+describe('logger', () => {
+  const originalError = pinoLogger.error;
+  let calls: unknown[][];
 
   beforeEach(() => {
-    lines = [];
-    logger.info = (...args: unknown[]) => {
-      lines.push(args);
-    };
+    calls = [];
+    pinoLogger.error = ((...args: unknown[]) => {
+      calls.push(args);
+    }) as typeof pinoLogger.error;
   });
 
   afterEach(() => {
-    logger.info = originalInfo;
+    pinoLogger.error = originalError;
   });
 
-  it('strips the newline morgan appends to every line', () => {
-    logger.stream.write('GET /api/health 200 4.201 ms - 87\n');
+  it('passes an error as the err field so its stack is serialized', () => {
+    const error = new Error('boom');
 
-    expect(lines).toEqual([['GET /api/health 200 4.201 ms - 87']]);
+    logger.error('Migration failed.', error);
+
+    expect(calls).toEqual([[{ err: error }, 'Migration failed.']]);
   });
 
-  it('writes through logger.info, so a stub on the logger captures request lines', () => {
-    logger.stream.write('POST /api/rides 201 12.004 ms - 214\n');
+  it('falls back to the error message when no text is given', () => {
+    const error = new Error('boom');
 
-    expect(lines).toHaveLength(1);
+    logger.error(error);
+
+    expect(calls).toEqual([[{ err: error }, 'boom']]);
+  });
+
+  it('formats plain arguments into a single message', () => {
+    logger.error('Port', 3000, 'in use');
+
+    expect(calls).toEqual([['Port 3000 in use']]);
   });
 });
