@@ -1,12 +1,11 @@
 import cors from 'cors';
 import express, { type Express } from 'express';
 import helmet from 'helmet';
-import { pinoHttp } from 'pino-http';
 import { toNodeHandler } from 'better-auth/node';
 
 import { auth } from './auth/auth.config';
 import { env } from './config/env';
-import { pinoLogger } from './lib/logger';
+import { httpLogger } from './lib/logger';
 import { errorHandler } from './middlewares/errorHandler.middleware';
 import { notFoundHandler } from './middlewares/notFound.middleware';
 import { responseMiddleware } from './middlewares/response.middleware';
@@ -19,7 +18,7 @@ export const createApp = (): Express => {
   app.use(responseMiddleware);
   app.use(helmet());
   app.use(cors({ origin: env.TRUSTED_ORIGINS, credentials: true }));
-  app.use(pinoHttp({ logger: pinoLogger }));
+  app.use(httpLogger);
 
   app.all('/api/auth/*', toNodeHandler(auth));
   app.use(express.json());
