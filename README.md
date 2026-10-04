@@ -22,7 +22,7 @@ API for Ride Connect — an employee carpooling platform where colleagues can of
 ## Prerequisites
 
 - **Node.js 20 or newer** — `.nvmrc` pins `20`, and `package.json` requires `>=20`. If you use nvm, run `nvm use`.
-- **PostgreSQL 16** — matching what CI runs. Any local install or a `docker run postgres:16` will do.
+- **PostgreSQL 18** — matching what CI and the deployed stack run. Any local install or a `docker run postgres:18` will do.
 - **npm** — the repo ships a `package-lock.json`.
 
 ## Setup

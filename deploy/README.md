@@ -1,6 +1,8 @@
-# Parallel host
+# Hosts
 
-Create the instance in the same region as the current host. Attach an Elastic IP. Open ports 22, 80, and 443. Install Docker Engine and the Compose plugin. Add the SSH user to the `docker` group.
+Pushes to `develop` deploy to the `dev` GitHub environment and pushes to `main` deploy to `prod`. Each environment points at its own instance; set both up the same way.
+
+Create the instance in the region set in `AWS_REGION`. Attach an Elastic IP. Open ports 22, 80, and 443. Install Docker Engine and the Compose plugin. Add the SSH user to the `docker` group.
 
 ```bash
 sudo mkdir -p /opt/ride-connect
@@ -13,13 +15,25 @@ Copy `compose.yml` and `Caddyfile` into `/opt/ride-connect/`. Create these files
 - `api.env` from `api.env.example`. `DATABASE_URL` must use hostname `postgres` and the same user, password, and database as `db.env`. `BETTER_AUTH_URL` is `https://` plus `SITE_ADDRESS`. `BETTER_AUTH_SECRET` is at least 32 characters.
 - `db.env` from `db.env.example`.
 
-Repository secrets for this workflow, separate from the current host:
+Secrets on each of the `dev` and `prod` environments, pointing at that environment's instance:
 
-- `DOCKER_EC2_HOST`
-- `DOCKER_EC2_USER`
-- `DOCKER_EC2_SSH_KEY` (same private key as the current host)
-- `DOCKER_EC2_INSTANCE_ID`
+- `EC2_HOST`
+- `EC2_USER`
+- `EC2_SSH_KEY`
+- `EC2_INSTANCE_ID`
+
+Repository secrets shared by both:
+
+- `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION`
 - `DOZZLE_USERS` (the `users.yml` for the log viewer, see below)
+
+The GHCR packages are private. Log the host in once with a classic personal access token that has only `read:packages`, so manual pulls work:
+
+```bash
+echo <token> | docker login ghcr.io -u <github-username> --password-stdin
+```
+
+Deploys log in with the job's own token in a throwaway Docker config, so they leave this login in place.
 
 ## Log viewer
 
@@ -33,8 +47,6 @@ docker run -it --rm amir20/dozzle:v11.1.3 generate <username> --name "<Full Name
 
 Merge the entries under a single `users:` key and save the whole file as the `DOZZLE_USERS` secret. Each deploy writes it to `/opt/ride-connect/dozzle/users.yml` and restarts Dozzle when it changed. To add or remove someone, update the secret and redeploy.
 
-After the first push, set the GHCR package `ride-connect-api` to public.
-
 When the first deploy has succeeded:
 
 ```bash
@@ -42,6 +54,4 @@ sudo cp ride-connect.service /etc/systemd/system/ride-connect.service
 sudo systemctl enable ride-connect.service
 ```
 
-The trial is done when the migrate container exits 0, `https://<SITE_ADDRESS>/api/health` returns 200, and an email-and-password sign-up against that origin returns a session.
-
-Promotion moves the current host's Elastic IP onto this instance, stops the current host, and sets `BETTER_AUTH_URL` to the original public URL. The workflow trigger changes to `develop` in that merge.
+A host is ready when the migrate container exits 0, `https://<SITE_ADDRESS>/api/health` returns 200, and an email-and-password sign-up against that origin returns a session.

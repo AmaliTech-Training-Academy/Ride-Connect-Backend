@@ -49,12 +49,12 @@ services:
       - backend
 
   postgres:
-    image: postgres:16
+    image: postgres:18
     restart: unless-stopped
     env_file:
       - db.env
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - postgres_data:/var/lib/postgresql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
       interval: 5s
