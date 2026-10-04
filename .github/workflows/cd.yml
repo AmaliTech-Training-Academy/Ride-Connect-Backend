@@ -5,6 +5,7 @@ on:
     branches:
       - develop
       - main
+      - feat/t54-docker-compose # temporary: test the dev deploy before the PR
 
 jobs:
   ci:
