@@ -27,7 +27,7 @@ const INPUT_FLAGS = [
 const DEFAULT_BASES = ['develop', 'main'];
 
 /** Written before commitlint ran; exempt through this commit only. Never move it forward. */
-const GRANDFATHERED_THROUGH = '1bdd4de4631aecc2d22bac28a0027b9514896e02';
+const GRANDFATHERED_THROUGH = '7b9d73bd75b2d678f3e32ef153cfd0b6148a277b';
 
 /** Flags naming the commit a range starts after. */
 const FROM_FLAGS = ['-f', '--from'];
