@@ -1,0 +1,139 @@
+name: CD
+
+on:
+  push:
+    branches:
+      - develop
+      - main
+
+jobs:
+  ci:
+    uses: ./.github/workflows/ci.yml
+    secrets: inherit
+  deploy:
+    needs: ci
+    runs-on: ubuntu-latest
+    environment: ${{ github.ref_name == 'main' && 'prod' || 'dev' }}
+    concurrency:
+      group: deploy-${{ github.ref_name }}
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set image tag
+        id: image
+        run: echo "tag=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push API image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          provenance: false
+          sbom: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          tags: ghcr.io/amalitech-training-academy/ride-connect-api:${{ steps.image.outputs.tag }}
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Ensure EC2 instance is running
+        run: |
+          STATE=$(aws ec2 describe-instances \
+            --instance-ids ${{ secrets.EC2_INSTANCE_ID }} \
+            --query 'Reservations[0].Instances[0].State.Name' \
+            --output text)
+          echo "Current state: $STATE"
+          if [ "$STATE" != "running" ]; then
+            echo "Instance is not running (Current: $STATE)." >&2
+            exit 1
+          fi
+
+      - name: Load SSH key
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.EC2_SSH_KEY }}
+
+      - name: Add host to known_hosts
+        run: ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Sync stack files
+        run: |
+          ssh ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} "mkdir -p /opt/ride-connect"
+          rsync -avz --inplace deploy/compose.yml deploy/Caddyfile \
+            ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:/opt/ride-connect/
+
+      - name: Write Dozzle users
+        env:
+          TARGET: ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}
+          DOZZLE_USERS: ${{ secrets.DOZZLE_USERS }}
+        run: |
+          if [ -z "$DOZZLE_USERS" ]; then
+            echo "DOZZLE_USERS secret is not set." >&2
+            exit 1
+          fi
+          printf '%s\n' "$DOZZLE_USERS" | ssh "$TARGET" '
+            set -e
+            mkdir -p /opt/ride-connect/dozzle
+            cd /opt/ride-connect/dozzle
+            umask 077
+            cat > users.yml.new
+            if cmp -s users.yml.new users.yml; then
+              rm users.yml.new
+            else
+              mv users.yml.new users.yml
+              touch .restart
+            fi
+          '
+
+      - name: Pull and start the stack
+        env:
+          TARGET: ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}
+          API_TAG: ${{ steps.image.outputs.tag }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          REMOTE=$(cat <<'EOF'
+          set -e
+          cd /opt/ride-connect
+          touch .env
+          TMP=$(mktemp)
+          grep -v '^API_TAG=' .env > "$TMP" || [ $? -eq 1 ]
+          echo "API_TAG=$API_TAG" >> "$TMP"
+          cat "$TMP" > .env
+          rm "$TMP"
+          # GITHUB_TOKEN dies with the job, so log in with a throwaway config
+          # and leave the host's own GHCR login untouched.
+          export DOCKER_CONFIG=$(mktemp -d)
+          trap 'rm -rf "$DOCKER_CONFIG"' EXIT
+          if [ -d "$HOME/.docker/cli-plugins" ]; then
+            ln -s "$HOME/.docker/cli-plugins" "$DOCKER_CONFIG/cli-plugins"
+          fi
+          docker login ghcr.io -u "$GHCR_USER" --password-stdin
+          docker compose pull
+          docker compose up -d
+          docker compose exec -T caddy caddy reload --config /etc/caddy/Caddyfile --adapter caddyfile
+          if [ -f dozzle/.restart ]; then
+            docker compose restart dozzle
+            rm dozzle/.restart
+          fi
+          EOF
+          )
+          printf '%s\n' "$GITHUB_TOKEN" | ssh "$TARGET" "API_TAG=$API_TAG GHCR_USER=$GITHUB_ACTOR; $REMOTE"
