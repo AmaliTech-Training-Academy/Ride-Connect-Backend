@@ -8,6 +8,7 @@ import { healthResponseSchema } from '../validators/health.validator';
 import { docsRouter } from './docs.routes';
 import { notificationsRouter } from './notifications.routes';
 import { ridesRouter } from './rides.routes';
+import { usersRouter } from './users.routes';
 
 export const apiRouter = Router();
 
@@ -28,6 +29,7 @@ apiRouter.get(
 
 apiRouter.use('/rides', ridesRouter);
 apiRouter.use('/notifications', notificationsRouter);
+apiRouter.use('/users', usersRouter);
 
 if (env.DOCS_ENABLED) {
   apiRouter.use('/docs', docsRouter);
