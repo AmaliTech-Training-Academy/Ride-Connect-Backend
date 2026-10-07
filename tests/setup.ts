@@ -29,6 +29,11 @@ process.env.BETTER_AUTH_SECRET ??= 'test-secret-not-used-outside-tests';
 process.env.BETTER_AUTH_URL ??= 'http://localhost:3000';
 // Pinned rather than defaulted so the CORS assertions don't depend on a developer's .env.
 process.env.TRUSTED_ORIGINS = 'https://frontend.example.com';
+process.env.AWS_REGION = 'eu-west-1';
+process.env.S3_BUCKET = 'ride-connect-avatars-test';
+process.env.MEDIA_BASE_URL = 'https://media.example.com';
+process.env.AWS_ACCESS_KEY_ID = 'test';
+process.env.AWS_SECRET_ACCESS_KEY = 'test';
 
 const testPool = new Pool({ connectionString: testDatabaseUrl });
 const testDb = drizzle(testPool);
