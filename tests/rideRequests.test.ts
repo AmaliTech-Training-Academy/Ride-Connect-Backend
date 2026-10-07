@@ -841,3 +841,32 @@ describe('Race-safe request decisions', () => {
     );
   });
 });
+
+describe('GET /rides acceptedPassengers', () => {
+  it('lists only accepted passengers, with public details only', async () => {
+    const driver = await registerUser('Grace Hopper');
+    const ride = await postRide(driver, { availableSeats: 3 });
+    const accepted = await registerUser('Ada Lovelace');
+    const pending = await registerUser('Alan Turing');
+    const created = await requestToJoin(ride.id, accepted);
+    await requestToJoin(ride.id, pending);
+    await request(app)
+      .patch(`/api/rides/${ride.id}/requests/${created.body.data.id}/accept`)
+      .set('Cookie', driver.cookie);
+
+    const listing = await request(app).get('/api/rides').set('Cookie', pending.cookie);
+    const listedRide = listing.body.data.find((listed: { id: string }) => listed.id === ride.id);
+
+    expect(listedRide.acceptedPassengers).toEqual([{ id: accepted.userId, name: 'Ada Lovelace', image: null }]);
+  });
+
+  it('returns an empty list for a ride with no accepted passengers', async () => {
+    const driver = await registerUser('Grace Hopper');
+    const ride = await postRide(driver);
+
+    const listing = await request(app).get('/api/rides').set('Cookie', driver.cookie);
+    const listedRide = listing.body.data.find((listed: { id: string }) => listed.id === ride.id);
+
+    expect(listedRide.acceptedPassengers).toEqual([]);
+  });
+});
