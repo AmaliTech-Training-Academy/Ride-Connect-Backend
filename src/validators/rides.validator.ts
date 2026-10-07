@@ -136,6 +136,18 @@ export const rideResponseSchema = z.object({
   createdAt: z.iso.datetime().nullable(),
 });
 
+/** A passenger already accepted onto a ride, as anyone browsing rides sees them. Public details only. */
+export const acceptedPassengerSchema = z.object({
+  id: z.uuid(),
+  name: z.string(),
+  image: z.string().nullable(),
+});
+
+/** A ride in the browse list, with the passengers already accepted onto it. */
+export const listedRideResponseSchema = rideResponseSchema.extend({
+  acceptedPassengers: z.array(acceptedPassengerSchema),
+});
+
 export const updateRideStatusSchema = z.object({
   status: z.enum(['OPEN', 'FULL', 'CANCELLED'], {
     error: 'Status must be one of OPEN, FULL, or CANCELLED.',

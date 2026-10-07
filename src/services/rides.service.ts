@@ -97,7 +97,7 @@ export async function listRides(filters: ListRidesQuery, exec: Executor = db) {
     }
   }
 
-  return exec
+  const found = await exec
     .select({
       id: rides.id,
       driverId: rides.driverId,
@@ -120,6 +120,45 @@ export async function listRides(filters: ListRidesQuery, exec: Executor = db) {
     .orderBy(asc(rides.departureAt), asc(rides.id))
     .limit(filters.limit)
     .offset(filters.offset);
+
+  const acceptedByRide = await loadAcceptedPassengers(
+    found.map((ride) => ride.id),
+    exec,
+  );
+
+  return found.map((ride) => ({ ...ride, acceptedPassengers: acceptedByRide.get(ride.id) ?? [] }));
+}
+
+/**
+ * Groups the passengers already accepted onto a set of Rides by ride id, for the public ride list.
+ * Only public profile details are returned (no email).
+ */
+async function loadAcceptedPassengers(rideIds: string[], exec: Executor) {
+  const byRide = new Map<string, { id: string; name: string; image: string | null }[]>();
+
+  if (rideIds.length === 0) {
+    return byRide;
+  }
+
+  const accepted = await exec
+    .select({
+      rideId: rideRequests.rideId,
+      id: users.id,
+      name: users.name,
+      image: users.image,
+    })
+    .from(rideRequests)
+    .innerJoin(users, eq(rideRequests.passengerId, users.id))
+    .where(and(inArray(rideRequests.rideId, rideIds), eq(rideRequests.status, 'ACCEPTED')))
+    .orderBy(asc(rideRequests.createdAt));
+
+  for (const passenger of accepted) {
+    const list = byRide.get(passenger.rideId) ?? [];
+    list.push({ id: passenger.id, name: passenger.name, image: passenger.image });
+    byRide.set(passenger.rideId, list);
+  }
+
+  return byRide;
 }
 
 /** True once a Ride has been cancelled or has run its course. */

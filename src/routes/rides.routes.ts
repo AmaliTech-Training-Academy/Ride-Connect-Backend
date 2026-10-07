@@ -35,6 +35,7 @@ import {
 import {
   cancelledRideResponseSchema,
   createRideSchema,
+  listedRideResponseSchema,
   listRidesSchema,
   myRidesResponseSchema,
   rideResponseSchema,
@@ -59,7 +60,7 @@ ridesRouter.get(
     secured: true,
     query: listRidesSchema,
     responses: {
-      200: { description: 'Matching rides', schema: successEnvelope(z.array(rideResponseSchema)) },
+      200: { description: 'Matching rides', schema: successEnvelope(z.array(listedRideResponseSchema)) },
       400: { description: 'Malformed filter', schema: validationErrorEnvelope },
       401: unauthorized,
     },
