@@ -35,6 +35,47 @@ echo <token> | docker login ghcr.io -u <github-username> --password-stdin
 
 Deploys log in with the job's own token in a throwaway Docker config, so they leave this login in place.
 
+## Avatar storage
+
+Each environment has its own S3 bucket, e.g. `ride-connect-avatars-dev-…` for `dev`. Set `AWS_REGION` and `S3_BUCKET` in `api.env`.
+
+The bucket:
+
+- Object Ownership: ACLs disabled.
+- Block Public Access: only the two ACL settings on.
+- Bucket policy: `s3:GetObject` for `"Principal": "*"` on `arn:aws:s3:::<bucket>/avatars/*`.
+- CORS: `POST` from the environment's `https://<SITE_ADDRESS>`, plus `http://localhost:5173` on `dev` only.
+
+The instance reaches the bucket through an IAM role, not access keys. Attach a role with this policy:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": ["s3:PutObject", "s3:GetObject", "s3:DeleteObject"],
+      "Resource": "arn:aws:s3:::<bucket>/avatars/*"
+    },
+    {
+      "Effect": "Allow",
+      "Action": "s3:ListBucket",
+      "Resource": "arn:aws:s3:::<bucket>"
+    }
+  ]
+}
+```
+
+`s3:ListBucket` lets the API tell a missing upload (404) apart from a permission error (403).
+
+The API runs in a container, one network hop past the instance, so set the metadata hop limit to 2 or the SDK cannot fetch the role's credentials:
+
+```bash
+aws ec2 modify-instance-metadata-options --instance-id <id> --http-tokens required --http-put-response-hop-limit 2
+```
+
+Check from the host with `docker run --rm amazon/aws-cli sts get-caller-identity`; it should name the role.
+
 ## Log viewer
 
 Dozzle serves live container logs at `https://<SITE_ADDRESS>/logs`. It reads Docker through a socket proxy that only allows read calls, so the viewer cannot start, stop, or exec into containers.

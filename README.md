@@ -54,6 +54,9 @@ Every variable below comes from `.env.example`.
 | `TRUSTED_ORIGINS` | No | empty | Comma-separated browser origins allowed to call the API (CORS). Empty allows no cross-origin request. |
 | `DOCS_ENABLED` | No | `true` | Set to `false` to stop serving the API reference at `/api/docs`. |
 | `ALLOWED_EMAIL_DOMAINS` | No | `amalitech.com,amalitechtraining.org` | Comma-separated domains allowed to register. Sign-up from any other domain is rejected. |
+| `AWS_REGION` | Yes | — | Region of the avatar bucket, e.g. `eu-west-1`. |
+| `S3_BUCKET` | Yes | — | S3 bucket that stores user avatars. |
+| `MEDIA_BASE_URL` | No | `https://<S3_BUCKET>.s3.<AWS_REGION>.amazonaws.com` | Public base URL saved avatar URLs are built from. |
 
 Notes:
 
@@ -65,6 +68,7 @@ Notes:
   node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
   ```
 
+- Locally the AWS SDK also needs credentials to sign uploads: set `AWS_PROFILE`, or `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`. On EC2 it uses the instance role. Tests never reach AWS.
 - `NODE_ENV` (`development` | `test` | `production`) is also read by the config schema and defaults to `development`. It is not listed in `.env.example` and you normally do not need to set it.
 
 ## Database
@@ -256,13 +260,31 @@ These are provided by better-auth under `/api/auth`. All of them need the sessio
 | Action | Endpoint | Body |
 | --- | --- | --- |
 | Get current user (includes `image`) | `GET /api/auth/get-session` | — |
-| Update profile picture | `POST /api/auth/update-user` | `{ "image": "<cloudinary url>" }` |
 | Change password | `POST /api/auth/change-password` | `{ "currentPassword": "...", "newPassword": "...", "revokeOtherSessions": true }` |
 | Log out | `POST /api/auth/sign-out` | `{}` |
 
-- The profile picture URL is stored in the `image` column of the `users` table. Upload the file to Cloudinary first, then save the returned URL.
+- The profile picture URL is stored in the `image` column of the `users` table. Set it with the avatar endpoints below.
 - Change password returns `400 INVALID_PASSWORD` when the current password is wrong and `400 PASSWORD_TOO_SHORT` when the new one is under 8 characters. With `revokeOtherSessions: true`, other devices are logged out.
 - Log out deletes the session from the database and clears the cookie, so the old cookie can no longer authenticate requests.
+
+## Profile picture upload
+
+Avatars live in S3. The browser uploads the file straight to the bucket; the API only signs the upload and saves the result.
+
+1. `POST /api/users/me/avatar/upload` with `{ "contentType": "image/jpeg" }` (`image/jpeg`, `image/png`, or `image/webp`). The response carries `url`, `fields`, and `key`.
+2. Send a `multipart/form-data` `POST` to `url` with every entry of `fields` first and the file last, under the name `file`. Do not send the session cookie. S3 answers `204`. Files over `maxBytes` (5 MB) or of a different type are rejected, and the form expires after `expiresIn` seconds.
+3. `PUT /api/users/me/avatar` with `{ "key": "<key from step 1>" }`. The response's `image` is the public URL, now also returned by `get-session`. The previous S3 avatar is deleted.
+
+```js
+const { data } = await api.post('/users/me/avatar/upload', { contentType: file.type });
+const form = new FormData();
+Object.entries(data.fields).forEach(([name, value]) => form.append(name, value));
+form.append('file', file);
+await fetch(data.url, { method: 'POST', body: form });
+await api.put('/users/me/avatar', { key: data.key });
+```
+
+Images uploaded to Cloudinary before this keep working; they are replaced the next time the user changes their picture.
 
 ## Contributing
 
