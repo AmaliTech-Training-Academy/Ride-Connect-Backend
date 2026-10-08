@@ -21,6 +21,7 @@ Secrets on each of the `dev` and `prod` environments, pointing at that environme
 - `EC2_USER`
 - `EC2_SSH_KEY`
 - `EC2_INSTANCE_ID`
+- `S3_BUCKET`, the avatar bucket for that environment
 
 Repository secrets shared by both:
 
@@ -37,7 +38,7 @@ Deploys log in with the job's own token in a throwaway Docker config, so they le
 
 ## Avatar storage
 
-Each environment has its own S3 bucket, e.g. `ride-connect-avatars-dev-…` for `dev`. Set `AWS_REGION` and `S3_BUCKET` in `api.env`.
+Each environment has its own S3 bucket, e.g. `ride-connect-avatars-dev-…` for `dev`. Each deploy writes `AWS_REGION` (from the repository secret) and `S3_BUCKET` (from the environment secret) into `api.env`, so do not edit them there by hand.
 
 The bucket:
 
