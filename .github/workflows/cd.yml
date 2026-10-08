@@ -104,6 +104,30 @@ jobs:
             fi
           '
 
+      - name: Write storage settings
+        env:
+          TARGET: ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}
+          AWS_REGION: ${{ secrets.AWS_REGION }}
+          S3_BUCKET: ${{ secrets.S3_BUCKET }}
+        run: |
+          if [ -z "$S3_BUCKET" ]; then
+            echo "S3_BUCKET secret is not set." >&2
+            exit 1
+          fi
+          printf 'AWS_REGION=%s\nS3_BUCKET=%s\n' "$AWS_REGION" "$S3_BUCKET" | ssh "$TARGET" '
+            set -e
+            cd /opt/ride-connect
+            if [ ! -f api.env ]; then
+              echo "api.env is missing on the host." >&2
+              exit 1
+            fi
+            TMP=$(mktemp)
+            grep -v -e "^AWS_REGION=" -e "^S3_BUCKET=" api.env > "$TMP" || [ $? -eq 1 ]
+            cat >> "$TMP"
+            cat "$TMP" > api.env
+            rm "$TMP"
+          '
+
       - name: Pull and start the stack
         env:
           TARGET: ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}
