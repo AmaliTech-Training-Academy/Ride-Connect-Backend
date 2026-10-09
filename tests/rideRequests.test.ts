@@ -641,6 +641,26 @@ describe('PATCH /rides/:rideId/requests/:requestId/remove', () => {
     expect(updatedRide.status).toBe('OPEN');
   });
 
+  it('shows the removal reason on the dashboard after a re-request was accepted', async () => {
+    const driver = await registerUser('Grace Hopper');
+    const ride = await postRide(driver, { availableSeats: 2 });
+    const passenger = await registerUser('Ada Lovelace');
+    const created = await requestToJoin(ride.id, passenger);
+    await declineAs(driver, ride.id, created.body.data.id, 'First reason.');
+    await rerequestAs(passenger, ride.id, created.body.data.id);
+    await request(app)
+      .patch(`/api/rides/${ride.id}/requests/${created.body.data.id}/accept`)
+      .set('Cookie', driver.cookie);
+
+    await removeAs(driver, ride.id, created.body.data.id, 'Plans changed, sorry.');
+
+    const response = await request(app).get('/api/rides/mine').set('Cookie', passenger.cookie);
+    const [joined] = response.body.data.joined;
+    expect(joined.requestStatus).toBe('DECLINED');
+    expect(joined.rejectionReason).toBe('First reason.');
+    expect(joined.finalRejectionReason).toBe('Plans changed, sorry.');
+  });
+
   it('rejects removing a request that is still pending', async () => {
     const driver = await registerUser('Grace Hopper');
     const ride = await postRide(driver);

@@ -193,6 +193,7 @@ export const joinedRideResponseSchema = rideResponseSchema.extend({
   requestStatus: z.enum(requestStatus.enumValues),
   requestedAt: z.iso.datetime().nullable(),
   rejectionReason: z.string().nullable(),
+  finalRejectionReason: z.string().nullable(),
   rerequestCount: z.number().int(),
 });
 
