@@ -277,8 +277,9 @@ export async function declineRequest(rideId: string, requestId: string, driverId
 
 /**
  * Lets the driver take back a seat they already gave: the accepted passenger is removed from
- * the Ride with a reason, and the seat is freed. The request ends up DECLINED, so the passenger
- * sees it the same way as a normal decline.
+ * the Ride with a reason, and the seat is freed. The request ends up DECLINED with the count
+ * reset, so the passenger can re-request once more; they are sent PASSENGER_REMOVED rather than
+ * REQUEST_DECLINED so the app can word it as a removal.
  *
  * Locks the ride row like `withdrawRequest`, since it gives a seat back the same way.
  */
@@ -324,12 +325,11 @@ export async function removePassenger(rideId: string, requestId: string, driverI
       .set({ availableSeats, status: ranOutOfSeats ? 'OPEN' : ride.status })
       .where(eq(rides.id, rideId));
 
-    const reasonField =
-      joinRequest.rerequestCount > 0 ? { finalRejectionReason: reason } : { rejectionReason: reason };
-
+    // A removed passenger gets one more chance to ask, even if they had already used their
+    // re-request to get accepted, so the count starts over and the reason is not a final one.
     const [removed] = await tx
       .update(rideRequests)
-      .set({ status: 'DECLINED', ...reasonField })
+      .set({ status: 'DECLINED', rejectionReason: reason, finalRejectionReason: null, rerequestCount: 0 })
       .where(and(eq(rideRequests.id, requestId), eq(rideRequests.status, 'ACCEPTED')))
       .returning({
         id: rideRequests.id,
@@ -342,7 +342,7 @@ export async function removePassenger(rideId: string, requestId: string, driverI
       throw CustomError.conflict(REQUEST_NOT_ACCEPTED);
     }
 
-    await notifications.notifyRequestDeclined(ride, requestId, joinRequest.passengerId, tx);
+    await notifications.notifyPassengerRemoved(ride, requestId, joinRequest.passengerId, tx);
 
     return removed;
   });
