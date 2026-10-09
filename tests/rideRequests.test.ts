@@ -619,8 +619,10 @@ describe('PATCH /rides/:rideId/requests/:requestId/remove', () => {
     const passengerNotifications = await db
       .select()
       .from(notifications)
-      .where(and(eq(notifications.userId, passenger.userId), eq(notifications.type, 'REQUEST_DECLINED')));
-    expect(passengerNotifications).toHaveLength(1);
+      .where(eq(notifications.userId, passenger.userId));
+    const types = passengerNotifications.map((notification) => notification.type);
+    expect(types).toContain('PASSENGER_REMOVED');
+    expect(types).not.toContain('REQUEST_DECLINED');
   });
 
   it('reopens a FULL ride when the removed passenger held the last seat', async () => {
@@ -641,7 +643,7 @@ describe('PATCH /rides/:rideId/requests/:requestId/remove', () => {
     expect(updatedRide.status).toBe('OPEN');
   });
 
-  it('shows the removal reason on the dashboard after a re-request was accepted', async () => {
+  it('gives a removed passenger one more re-request, even if they had already used theirs', async () => {
     const driver = await registerUser('Grace Hopper');
     const ride = await postRide(driver, { availableSeats: 2 });
     const passenger = await registerUser('Ada Lovelace');
@@ -657,8 +659,16 @@ describe('PATCH /rides/:rideId/requests/:requestId/remove', () => {
     const response = await request(app).get('/api/rides/mine').set('Cookie', passenger.cookie);
     const [joined] = response.body.data.joined;
     expect(joined.requestStatus).toBe('DECLINED');
-    expect(joined.rejectionReason).toBe('First reason.');
-    expect(joined.finalRejectionReason).toBe('Plans changed, sorry.');
+    expect(joined.rejectionReason).toBe('Plans changed, sorry.');
+    expect(joined.finalRejectionReason).toBeNull();
+    expect(joined.rerequestCount).toBe(0);
+
+    const rerequested = await rerequestAs(passenger, ride.id, created.body.data.id);
+    expect(rerequested.status).toBe(200);
+
+    await declineAs(driver, ride.id, created.body.data.id, 'Still no room.');
+    const secondRerequest = await rerequestAs(passenger, ride.id, created.body.data.id);
+    expect(secondRerequest.status).toBe(409);
   });
 
   it('rejects removing a request that is still pending', async () => {
