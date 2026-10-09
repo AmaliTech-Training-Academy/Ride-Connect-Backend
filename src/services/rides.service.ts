@@ -271,6 +271,7 @@ export async function listMyRides(userId: string, exec: Executor = db) {
       requestStatus: rideRequests.status,
       requestedAt: rideRequests.createdAt,
       rejectionReason: rideRequests.rejectionReason,
+      finalRejectionReason: rideRequests.finalRejectionReason,
       rerequestCount: rideRequests.rerequestCount,
     })
     .from(rideRequests)
@@ -315,6 +316,7 @@ export async function listMyRides(userId: string, exec: Executor = db) {
       requestStatus: myRequest.requestStatus,
       requestedAt: myRequest.requestedAt,
       rejectionReason: myRequest.rejectionReason,
+      finalRejectionReason: myRequest.finalRejectionReason,
       rerequestCount: myRequest.rerequestCount,
     };
   });

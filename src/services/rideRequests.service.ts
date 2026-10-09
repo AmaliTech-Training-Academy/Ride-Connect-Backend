@@ -18,7 +18,9 @@ const RIDE_FULL = 'This ride is full.';
 const NOT_RIDE_OWNER_VIEW = 'Only the driver who owns this ride can view its requests.';
 const NOT_RIDE_OWNER_ACCEPT = 'Only the driver who owns this ride can accept its requests.';
 const NOT_RIDE_OWNER_DECLINE = 'Only the driver who owns this ride can decline its requests.';
-const NOT_REQUEST_OWNER = 'Only the passenger who made this request can withdraw it.';
+const NOT_RIDE_OWNER_REMOVE = 'Only the driver who owns this ride can remove its passengers.';
+const REQUEST_NOT_ACCEPTED = 'Only an accepted passenger can be removed from the ride.';
+const NOT_REQUEST_OWNER ='Only the passenger who made this request can withdraw it.';
 const REQUEST_ALREADY_INACTIVE = 'This request has already been declined or withdrawn.';
 const NOT_REQUEST_OWNER_REREQUEST = 'Only the passenger who made this request can request again.';
 const REQUEST_NOT_DECLINED = 'You can only request again after your request has been declined.';
@@ -270,6 +272,79 @@ export async function declineRequest(rideId: string, requestId: string, driverId
     await notifications.notifyRequestDeclined(ride, requestId, joinRequest.passengerId, tx);
 
     return declined;
+  });
+}
+
+/**
+ * Lets the driver take back a seat they already gave: the accepted passenger is removed from
+ * the Ride with a reason, and the seat is freed. The request ends up DECLINED, so the passenger
+ * sees it the same way as a normal decline.
+ *
+ * Locks the ride row like `withdrawRequest`, since it gives a seat back the same way.
+ */
+export async function removePassenger(rideId: string, requestId: string, driverId: string, reason: string) {
+  return db.transaction(async (tx) => {
+    const [ride] = await tx.select().from(rides).where(eq(rides.id, rideId)).for('update');
+
+    if (!ride) {
+      throw CustomError.notFound(RIDE_NOT_FOUND);
+    }
+
+    if (ride.driverId !== driverId) {
+      throw CustomError.forbidden(NOT_RIDE_OWNER_REMOVE);
+    }
+
+    if (ride.status === 'CANCELLED') {
+      throw CustomError.conflict(RIDE_CANCELLED);
+    }
+
+    if (ride.status === 'COMPLETED' || hasDeparted(ride.departureAt)) {
+      throw CustomError.conflict(RIDE_COMPLETED);
+    }
+
+    const [joinRequest] = await tx
+      .select()
+      .from(rideRequests)
+      .where(and(eq(rideRequests.id, requestId), eq(rideRequests.rideId, rideId)));
+
+    if (!joinRequest) {
+      throw CustomError.notFound(REQUEST_NOT_FOUND);
+    }
+
+    if (joinRequest.status !== 'ACCEPTED') {
+      throw CustomError.conflict(REQUEST_NOT_ACCEPTED);
+    }
+
+    const availableSeats = Math.min(ride.availableSeats + 1, ride.totalSeats);
+    // Same rule as a withdrawal: only reopen a ride that was full because it ran out of seats.
+    const ranOutOfSeats = ride.status === 'FULL' && ride.availableSeats === 0;
+
+    await tx
+      .update(rides)
+      .set({ availableSeats, status: ranOutOfSeats ? 'OPEN' : ride.status })
+      .where(eq(rides.id, rideId));
+
+    const reasonField =
+      joinRequest.rerequestCount > 0 ? { finalRejectionReason: reason } : { rejectionReason: reason };
+
+    const [removed] = await tx
+      .update(rideRequests)
+      .set({ status: 'DECLINED', ...reasonField })
+      .where(and(eq(rideRequests.id, requestId), eq(rideRequests.status, 'ACCEPTED')))
+      .returning({
+        id: rideRequests.id,
+        rideId: rideRequests.rideId,
+        passengerId: rideRequests.passengerId,
+        status: rideRequests.status,
+      });
+
+    if (!removed) {
+      throw CustomError.conflict(REQUEST_NOT_ACCEPTED);
+    }
+
+    await notifications.notifyRequestDeclined(ride, requestId, joinRequest.passengerId, tx);
+
+    return removed;
   });
 }
 

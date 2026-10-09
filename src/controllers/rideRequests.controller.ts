@@ -7,7 +7,8 @@ const NO_PENDING_REQUESTS = 'No pending requests for this ride.';
 const REQUESTS_FETCHED = 'Requests fetched successfully';
 const REQUEST_ACCEPTED = 'Request accepted successfully';
 const REQUEST_DECLINED = 'Request declined successfully';
-const REQUEST_WITHDRAWN = 'Request withdrawn successfully';
+const PASSENGER_REMOVED = 'Passenger removed successfully';
+const REQUEST_WITHDRAWN ='Request withdrawn successfully';
 const REQUEST_SENT_AGAIN = 'Request sent again successfully';
 
 /** POST /api/rides/:rideId/requests — a passenger asks to join an open Ride. */
@@ -62,6 +63,24 @@ export const declineRequest = authedController<{ params: RequestIdParams; body: 
 
   res.customSuccess({
     message: REQUEST_DECLINED,
+    data: request,
+  });
+});
+
+/**
+ * PATCH /api/rides/:rideId/requests/:requestId/remove — the Driver removes a passenger they
+ * already accepted, with a reason, and gets the seat back.
+ */
+export const removePassenger = authedController<{ params: RequestIdParams; body: ReasonBody }>(async (req, res) => {
+  const request = await rideRequestsService.removePassenger(
+    req.validated.params.rideId,
+    req.validated.params.requestId,
+    req.auth.user.id,
+    req.validated.body.reason,
+  );
+
+  res.customSuccess({
+    message: PASSENGER_REMOVED,
     data: request,
   });
 });
