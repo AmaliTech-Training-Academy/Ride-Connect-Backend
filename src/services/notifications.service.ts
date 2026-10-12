@@ -110,6 +110,19 @@ export async function notifyRequestDeclined(
   );
 }
 
+/** Tells a Passenger that the Driver removed them from a Ride they had been accepted on. */
+export async function notifyPassengerRemoved(
+  ride: RideContext,
+  requestId: string,
+  passengerId: string,
+  exec: Executor = db,
+): Promise<void> {
+  await insertNotifications(
+    [rideNotification('PASSENGER_REMOVED', ride, passengerId, requestId, ride.driverId)],
+    exec,
+  );
+}
+
 /** Tells a Ride's Driver that a confirmed Passenger has given up their seat. */
 export async function notifyPassengerWithdrew(
   ride: RideContext,

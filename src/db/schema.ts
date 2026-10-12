@@ -136,6 +136,9 @@ export const notificationType = pgEnum('notification_type', [
   'PASSENGER_WITHDREW',
   'RIDE_CANCELLED',
   'RIDE_UPDATED',
+  // The driver took back a seat they had already given. Kept apart from REQUEST_DECLINED so
+  // the passenger can be told they were removed, not that their request was turned down.
+  'PASSENGER_REMOVED',
 ]);
 
 /**

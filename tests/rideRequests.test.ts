@@ -584,6 +584,130 @@ describe('PATCH /rides/:rideId/requests/:requestId/rerequest', () => {
   });
 });
 
+/** Removes an accepted passenger as the driver, with a reason. */
+function removeAs(driver: AuthedUser, rideId: string, requestId: string, reason = 'Plans changed, sorry.') {
+  return request(app)
+    .patch(`/api/rides/${rideId}/requests/${requestId}/remove`)
+    .set('Cookie', driver.cookie)
+    .send({ reason });
+}
+
+describe('PATCH /rides/:rideId/requests/:requestId/remove', () => {
+  it('removes an accepted passenger, gives back the seat and tells the passenger', async () => {
+    const driver = await registerUser('Grace Hopper');
+    const ride = await postRide(driver, { availableSeats: 2 });
+    const passenger = await registerUser('Ada Lovelace');
+    const created = await requestToJoin(ride.id, passenger);
+    await request(app)
+      .patch(`/api/rides/${ride.id}/requests/${created.body.data.id}/accept`)
+      .set('Cookie', driver.cookie);
+
+    const response = await removeAs(driver, ride.id, created.body.data.id);
+
+    expect(response.status).toBe(200);
+    expect(response.body.data.status).toBe('DECLINED');
+
+    const [updatedRide] = await db.select().from(rides).where(eq(rides.id, ride.id));
+    expect(updatedRide.availableSeats).toBe(2);
+
+    const [updatedRequest] = await db
+      .select()
+      .from(rideRequests)
+      .where(eq(rideRequests.id, created.body.data.id));
+    expect(updatedRequest.rejectionReason).toBe('Plans changed, sorry.');
+
+    const passengerNotifications = await db
+      .select()
+      .from(notifications)
+      .where(eq(notifications.userId, passenger.userId));
+    const types = passengerNotifications.map((notification) => notification.type);
+    expect(types).toContain('PASSENGER_REMOVED');
+    expect(types).not.toContain('REQUEST_DECLINED');
+  });
+
+  it('reopens a FULL ride when the removed passenger held the last seat', async () => {
+    const driver = await registerUser('Grace Hopper');
+    const ride = await postRide(driver, { availableSeats: 1 });
+    const passenger = await registerUser('Ada Lovelace');
+    const created = await requestToJoin(ride.id, passenger);
+    await request(app)
+      .patch(`/api/rides/${ride.id}/requests/${created.body.data.id}/accept`)
+      .set('Cookie', driver.cookie);
+
+    const response = await removeAs(driver, ride.id, created.body.data.id);
+
+    expect(response.status).toBe(200);
+
+    const [updatedRide] = await db.select().from(rides).where(eq(rides.id, ride.id));
+    expect(updatedRide.availableSeats).toBe(1);
+    expect(updatedRide.status).toBe('OPEN');
+  });
+
+  it('gives a removed passenger one more re-request, even if they had already used theirs', async () => {
+    const driver = await registerUser('Grace Hopper');
+    const ride = await postRide(driver, { availableSeats: 2 });
+    const passenger = await registerUser('Ada Lovelace');
+    const created = await requestToJoin(ride.id, passenger);
+    await declineAs(driver, ride.id, created.body.data.id, 'First reason.');
+    await rerequestAs(passenger, ride.id, created.body.data.id);
+    await request(app)
+      .patch(`/api/rides/${ride.id}/requests/${created.body.data.id}/accept`)
+      .set('Cookie', driver.cookie);
+
+    await removeAs(driver, ride.id, created.body.data.id, 'Plans changed, sorry.');
+
+    const response = await request(app).get('/api/rides/mine').set('Cookie', passenger.cookie);
+    const [joined] = response.body.data.joined;
+    expect(joined.requestStatus).toBe('DECLINED');
+    expect(joined.rejectionReason).toBe('Plans changed, sorry.');
+    expect(joined.finalRejectionReason).toBeNull();
+    expect(joined.rerequestCount).toBe(0);
+
+    const rerequested = await rerequestAs(passenger, ride.id, created.body.data.id);
+    expect(rerequested.status).toBe(200);
+
+    await declineAs(driver, ride.id, created.body.data.id, 'Still no room.');
+    const secondRerequest = await rerequestAs(passenger, ride.id, created.body.data.id);
+    expect(secondRerequest.status).toBe(409);
+  });
+
+  it('rejects removing a request that is still pending', async () => {
+    const driver = await registerUser('Grace Hopper');
+    const ride = await postRide(driver);
+    const passenger = await registerUser('Ada Lovelace');
+    const created = await requestToJoin(ride.id, passenger);
+
+    const response = await removeAs(driver, ride.id, created.body.data.id);
+
+    expect(response.status).toBe(409);
+  });
+
+  it('rejects a remove from someone who is not the driver', async () => {
+    const driver = await registerUser('Grace Hopper');
+    const ride = await postRide(driver);
+    const passenger = await registerUser('Ada Lovelace');
+    const created = await requestToJoin(ride.id, passenger);
+    await request(app)
+      .patch(`/api/rides/${ride.id}/requests/${created.body.data.id}/accept`)
+      .set('Cookie', driver.cookie);
+
+    const response = await removeAs(passenger, ride.id, created.body.data.id);
+
+    expect(response.status).toBe(403);
+  });
+
+  it('requires a reason', async () => {
+    const driver = await registerUser('Grace Hopper');
+    const ride = await postRide(driver);
+    const passenger = await registerUser('Ada Lovelace');
+    const created = await requestToJoin(ride.id, passenger);
+
+    const response = await removeAs(driver, ride.id, created.body.data.id, '   ');
+
+    expect(response.status).toBe(400);
+  });
+});
+
 describe('PATCH /rides/:rideId/requests/:requestId/withdraw', () => {
   it('withdraws a pending request without changing seat availability', async () => {
     const driver = await registerUser('Grace Hopper');
@@ -839,5 +963,34 @@ describe('Race-safe request decisions', () => {
     expect(written[0]?.type).toBe(
       stored.status === 'ACCEPTED' ? 'REQUEST_ACCEPTED' : 'REQUEST_DECLINED',
     );
+  });
+});
+
+describe('GET /rides acceptedPassengers', () => {
+  it('lists only accepted passengers, with public details only', async () => {
+    const driver = await registerUser('Grace Hopper');
+    const ride = await postRide(driver, { availableSeats: 3 });
+    const accepted = await registerUser('Ada Lovelace');
+    const pending = await registerUser('Alan Turing');
+    const created = await requestToJoin(ride.id, accepted);
+    await requestToJoin(ride.id, pending);
+    await request(app)
+      .patch(`/api/rides/${ride.id}/requests/${created.body.data.id}/accept`)
+      .set('Cookie', driver.cookie);
+
+    const listing = await request(app).get('/api/rides').set('Cookie', pending.cookie);
+    const listedRide = listing.body.data.find((listed: { id: string }) => listed.id === ride.id);
+
+    expect(listedRide.acceptedPassengers).toEqual([{ id: accepted.userId, name: 'Ada Lovelace', image: null }]);
+  });
+
+  it('returns an empty list for a ride with no accepted passengers', async () => {
+    const driver = await registerUser('Grace Hopper');
+    const ride = await postRide(driver);
+
+    const listing = await request(app).get('/api/rides').set('Cookie', driver.cookie);
+    const listedRide = listing.body.data.find((listed: { id: string }) => listed.id === ride.id);
+
+    expect(listedRide.acceptedPassengers).toEqual([]);
   });
 });

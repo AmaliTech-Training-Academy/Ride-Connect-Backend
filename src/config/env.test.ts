@@ -7,6 +7,8 @@ const VALID_ENV = {
   BETTER_AUTH_SECRET: 'a'.repeat(32),
   BETTER_AUTH_URL: 'http://localhost:3000',
   TRUSTED_ORIGINS: 'http://localhost:5173',
+  AWS_REGION: 'eu-west-1',
+  S3_BUCKET: 'ride-connect-avatars-test',
 };
 
 const envWithout = (key: keyof typeof VALID_ENV): Record<string, string> => {
@@ -63,5 +65,17 @@ describe('envSchema', () => {
 
   it('yields no trusted origins when TRUSTED_ORIGINS is unset', () => {
     expect(envSchema.parse(envWithout('TRUSTED_ORIGINS')).TRUSTED_ORIGINS).toEqual([]);
+  });
+
+  it('rejects a missing S3_BUCKET', () => {
+    expect(envSchema.safeParse(envWithout('S3_BUCKET')).success).toBe(false);
+  });
+
+  it('rejects a missing AWS_REGION', () => {
+    expect(envSchema.safeParse(envWithout('AWS_REGION')).success).toBe(false);
+  });
+
+  it('rejects a MEDIA_BASE_URL that is not a URL', () => {
+    expect(envSchema.safeParse({ ...VALID_ENV, MEDIA_BASE_URL: 'bucket' }).success).toBe(false);
   });
 });

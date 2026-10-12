@@ -57,6 +57,13 @@
       "when": 1790847037297,
       "tag": "0007_rides_status_departure_index",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1791556491875,
+      "tag": "0008_passenger_removed_notification",
+      "breakpoints": true
     }
   ]
 }

@@ -6,6 +6,7 @@ import {
   createRequest,
   declineRequest,
   listRideRequests,
+  removePassenger,
   rerequestRequest,
   withdrawRequest,
 } from '../controllers/rideRequests.controller';
@@ -35,6 +36,7 @@ import {
 import {
   cancelledRideResponseSchema,
   createRideSchema,
+  listedRideResponseSchema,
   listRidesSchema,
   myRidesResponseSchema,
   rideResponseSchema,
@@ -59,7 +61,7 @@ ridesRouter.get(
     secured: true,
     query: listRidesSchema,
     responses: {
-      200: { description: 'Matching rides', schema: successEnvelope(z.array(rideResponseSchema)) },
+      200: { description: 'Matching rides', schema: successEnvelope(z.array(listedRideResponseSchema)) },
       400: { description: 'Malformed filter', schema: validationErrorEnvelope },
       401: unauthorized,
     },
@@ -264,6 +266,29 @@ ridesRouter.patch(
     },
   }),
   declineRequest,
+);
+
+ridesRouter.patch(
+  '/:rideId/requests/:requestId/remove',
+  requireAuth,
+  documentedRoute({
+    method: 'patch',
+    path: '/rides/:rideId/requests/:requestId/remove',
+    tags: ['Ride requests'],
+    summary: 'Remove a passenger you already accepted, with a reason',
+    secured: true,
+    params: requestIdParamsSchema,
+    body: reasonBodySchema,
+    responses: {
+      200: { description: 'Passenger removed', schema: successEnvelope(rideRequestDecisionSchema) },
+      400: { description: 'Malformed id or missing reason', schema: validationErrorEnvelope },
+      401: unauthorized,
+      403: { description: 'Not the ride owner', schema: errorEnvelope },
+      404: { description: 'No such ride or request', schema: errorEnvelope },
+      409: { description: 'Request not accepted, or ride cancelled or departed', schema: errorEnvelope },
+    },
+  }),
+  removePassenger,
 );
 
 ridesRouter.patch(

@@ -34,6 +34,9 @@ export const envSchema = z.object({
         .map((origin) => origin.trim())
         .filter(Boolean)
     ),
+  AWS_REGION: z.string().min(1),
+  S3_BUCKET: z.string().min(1),
+  MEDIA_BASE_URL: z.url().optional(),
 });
 
 export type Env = z.infer<typeof envSchema>;
@@ -45,4 +48,9 @@ if (!parsed.success) {
   process.exit(1);
 }
 
-export const env = parsed.data;
+export const env = {
+  ...parsed.data,
+  MEDIA_BASE_URL: (
+    parsed.data.MEDIA_BASE_URL ?? `https://${parsed.data.S3_BUCKET}.s3.${parsed.data.AWS_REGION}.amazonaws.com`
+  ).replace(/\/+$/, ''),
+};
